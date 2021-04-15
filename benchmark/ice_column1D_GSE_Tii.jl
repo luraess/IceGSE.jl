@@ -1,4 +1,5 @@
 # Solve: 0 = eta * dVx/dz - rhog(H-z)*sin(alpha)
+# See https://doi.org/10.5194/tc-2020-295
 using Plots, Printf, LinearAlgebra, Statistics
 
 const s2yr = 3600*24*365.25
@@ -198,25 +199,26 @@ end
             Vxe[end] =  Vxe[end-1]
             if mod(iter, nout)==0
                 err  = norm(Fx)/length(Fx)
-                # errd = norm(r_d)/length(r_d)
-                @printf("it=%d, iter %d, %2.2e, %2.2e, %1.3f, %1.3f\n", it, iter, err, errd, minimum(d)*1e3, maximum(d)*1e3) end
-                iter += 1
+                @printf("it=%d, iter %d, %2.2e, %2.2e, %1.3f, %1.3f\n", it, iter, err, errd, minimum(d)*1e3, maximum(d)*1e3)
             end
-            # Behn et al.
-            Txz_Behn, Eii_Behn, η_Behn, dB, Vx_Behn = check_Behn(T, zv, d_i, λ_disl, λ_gbs, Kgg, Qgg, R, gam, p, c, ρ, g, α, dz, fact)
-            # visualisation
-            p1 = plot(Vxe[2:end-1]*s2yr, zc, linewidth=:3.0, framestyle=:box, xlabel="Vx [m/yr]", ylabel="depth [m]", label="This study")
-                 plot!(Vx_Behn[1:10:end]*s2yr, zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21", legend=:topleft)
-            p2 = plot(ϵxz, zv, linewidth=:3.0, framestyle=:box, xlabel="log10(ϵxz) [1/s]", label="This study")
-                 plot!(Eii_Behn[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn")
-            p3 = plot(1e-6*τxz, zv, linewidth=:3.0, framestyle=:box, xlabel="τxz [MPa]", label="This study")
-                 plot!(1e-6*Txz_Behn[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn")
-            p4 = plot(log10.(ηv), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(η) [Pa.s]", ylabel="depth [m]", label="This study")
-                 plot!(log10.(η_Behn)[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn", legend=:bottomright)
-            p5 = plot(1e3*d, zv, linewidth=:3.0, framestyle=:box, xlabel="d [mm]", label="This study")
-                 plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn", legend=:bottomright)
-            display(plot(p1, p2, p4, p5))
+            iter += 1
         end
+        # Behn et al.
+        Txz_Behn, Eii_Behn, η_Behn, dB, Vx_Behn = check_Behn(T, zv, d_i, λ_disl, λ_gbs, Kgg, Qgg, R, gam, p, c, ρ, g, α, dz, fact)
+        # visualisation
+        p1 = plot(Vxe[2:end-1]*s2yr, zc, linewidth=:3.0, framestyle=:box, xlabel="Vx [m/yr]", ylabel="depth [m]", label="This study")
+        plot!(Vx_Behn[1:10:end]*s2yr, zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21", legend=:topleft)
+        p2 = plot(ϵxz, zv, linewidth=:3.0, framestyle=:box, xlabel="log10(ϵxz) [1/s]", label="This study")
+        plot!(Eii_Behn[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
+        p3 = plot(1e-6*τxz, zv, linewidth=:3.0, framestyle=:box, xlabel="τxz [MPa]", label="This study")
+        plot!(1e-6*Txz_Behn[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
+        p4 = plot(log10.(ηv), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(η) [Pa.s]", ylabel="depth [m]", label="This study")
+        plot!(log10.(η_Behn)[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21", legend=:bottomright)
+        p5 = plot(1e3*d, zv, linewidth=:3.0, framestyle=:box, xlabel="d [mm]", label="This study")
+        plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21", legend=:bottomright)
+        display(plot(p1, p2, p4, p5))
+    end
+    # savefig("ice_column1D_GSE_Tii.png")
     return
 end
 

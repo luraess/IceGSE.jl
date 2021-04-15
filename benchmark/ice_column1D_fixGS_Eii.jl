@@ -1,4 +1,5 @@
 # Solve: 0 = eta * dVx/dz - rhog(H-z)*sin(alpha)
+# See https://doi.org/10.5194/tc-2020-295
 using Plots, Printf, LinearAlgebra
 
 const s2yr = 3600*24*365.25
