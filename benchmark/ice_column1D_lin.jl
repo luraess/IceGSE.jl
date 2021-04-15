@@ -6,6 +6,7 @@ const s2y = 3600*24*365.25
 
 @views function ice_column1D()
     # physics
+    fact  = 2.0
     H     = 1e3       # domain height [m]
     α     = 3.0*π/180 # slope angle   [rad]
     ρ     = 930       # ice density   [kg/m^3]
@@ -33,7 +34,7 @@ const s2y = 3600*24*365.25
     iter = 1; err = 2*tol
     while err>tol && iter<iterMax
         ϵxz     .= 0.5.*diff(Vxe)/dz .+ ϵ_bg
-        τxz     .= 2.0*ηv.*ϵxz
+        τxz     .= fact*ηv.*ϵxz
         Fx      .= diff(τxz)/dz .- ρ.*g.*sin(α)
         dVxdτ   .= Fx .+ dVxdτ*damp
         dτVx     = dz*dz/η0/2.1
@@ -43,9 +44,14 @@ const s2y = 3600*24*365.25
         if mod(iter,nout)==0  err = norm(Fx)/length(Fx); @printf("iter %d, %2.2e\n", iter, err)  end
         iter += 1
     end
+    Txz_a = ρ.*g.*(zv).*sin(α)
+    Eii_a = Txz_a./fact/η0
+    Vx_a  = cumsum(Eii_a.*dz.*2.0)
     # visualisation
-    p1 = plot(Vxe[2:end-1]*s2y, zc, legend=:false, linewidth=:3.0, framestyle=:box, xlabel="Vx [m/yr]", ylabel="depth [m]")
-    p2 = plot(τxz*1e-6, zv, legend=:false, linewidth=:3.0, framestyle=:box, xlabel="τxz [MPa]")
+    p1 = plot(Vxe[2:end-1]*s2y, zc, linewidth=:3.0, framestyle=:box, xlabel="Vx [m/yr]", ylabel="depth [m]", label="numerics")
+         plot!(Vx_a[1:10:end]*s2y, zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=5, label="analytics", legend=:bottomright)
+    p2 = plot(τxz*1e-6, zv, linewidth=:3.0, framestyle=:box, xlabel="τxz [MPa]", label="numerics")
+         plot!(Txz_a[1:10:end]*1e-6, zv[1:10:end],linewidth=:0.0, markershape=:circle, markersize=5, label="analytics", legend=:bottomleft)
     display(plot(p1, p2))
     return
 end

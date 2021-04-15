@@ -21,6 +21,8 @@ The benchmark folder contains following 1D codes for the 1D ice column configura
 - [`ice_column1D_fixGS_Tii.jl`](benchmark/ice_column1D_fixGS_Tii.jl) a composite rheology (GBS and dislocation creep) version with stress dependent viscosity η(τII) and fixed grain size
 - [`ice_column1D_GSE_Tii.jl`](benchmark/ice_column1D_GSE_Tii.jl) a composite rheology (GBS and dislocation creep) version with stress dependent viscosity η(τII) and grain size evolution
 
+The symbolic math derivation of "experimental to model" formulation is done in the [`FlowLawConversionFromLab2.ipynb`](benchmark/FlowLawConversionFromLab2.ipynb) notebook.
+
 ## Results
 We used the parameters and configuration from the 1D ice column case (Section 3.3, Fig. 6) to reproduce Figure 6 using the [`ice_column1D_GSE_Tii.jl`](benchmark/ice_column1D_GSE_Tii.jl) code:
 
