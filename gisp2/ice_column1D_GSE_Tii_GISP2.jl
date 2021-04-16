@@ -118,8 +118,8 @@ end
     data  = load(dat_file)
     Depth = data["depth"]
     Temp  = data["temp"]
-    Depth = [0.0;    Depth[1:end]]
-    Temp  = [Temp[1]; Temp[1:end]] .+ 273.15
+    Depth = [0.0;    Depth]
+    Temp  = [Temp[1]; Temp] .+ 273.15
     zv2   = LinRange(Depth[1], Depth[end], length(T2))
     itp1  = interpolate((Depth[:],), Temp[:], Gridded(Linear()))
     T2   .= reverse(itp1(zv2))
@@ -184,11 +184,11 @@ end
     # load and interpolate data
     T      =  zeros(nz+1)
     ztop, zbot = load_data!(T, "./data_gisp2.jld")
-    @show((ztop, zbot, T[1], T[end]))
+    # @show((ztop, zbot, T[1], T[end]))
     # error("stop")
     # initial conditions
     zc     = LinRange(-zbot+dz/2, ztop-dz/2, nz  )
-    zv     = LinRange(-zbot     , ztop,      nz+1)
+    zv     = LinRange(-zbot     , ztop     , nz+1)
     # display(plot(T,zv))
     # error("stop")
     ηv     =  η0.*ones(nz+1)
