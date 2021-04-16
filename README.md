@@ -23,10 +23,18 @@ The benchmark folder contains following 1D codes for the 1D ice column configura
 
 The symbolic math derivation of "experimental to model" formulation is done in the [`FlowLawConversionFromLab2.ipynb`](benchmark/FlowLawConversionFromLab2.ipynb) notebook.
 
+The [GISP2](gisp2) folder contains the codes to reproduce the ice core data configuration (Section 3.4):
+- [`ice_column1D_fixGS_Tii_GISP2.jl`](benchmark/ice_column1D_fixGS_Tii_GISP2.jl) a composite rheology (GBS and dislocation creep) version with stress dependent viscosity η(τII), fixed grain size and temperature data for the GISP2 setup.
+- [`ice_column1D_GSE_Tii_GISP2.jl`](gisp2/ice_column1D_GSE_Tii_GISP2.jl) a composite rheology (GBS and dislocation creep) version with stress dependent viscosity η(τII), grain size evolution, temperature data for the GISP2 setup and depth-dependent age
+
 ## Results
-We used the parameters and configuration from the 1D ice column case (Section 3.3, Fig. 6) to reproduce Figure 6 using the [`ice_column1D_GSE_Tii.jl`](benchmark/ice_column1D_GSE_Tii.jl) code:
+- We used the parameters and configuration from the 1D ice column case (Section 3.3, Fig. 6) to reproduce Figure 6 using the [`ice_column1D_GSE_Tii.jl`](benchmark/ice_column1D_GSE_Tii.jl) code:
 
 ![](docs/ice_column1D_GSE_Tii.png)
+
+- We used the parameters and configuration from the 1D ice core data case (Section 3.4, Fig 7) to reproduce Figure 7 using the [`ice_column1D_GSE_Tii_GISP2.jl`](gisp2/ice_column1D_GSE_Tii_GISP2.jl) code:
+
+![](docs/ice_column1D_GSE_Tii_gisp2.png)
 
 
 # References
