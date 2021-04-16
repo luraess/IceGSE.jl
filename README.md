@@ -3,7 +3,7 @@ Grain size evolution model for composite ice rheology.
 
 This repository contains [Julia] routines implementing Goldsby composite ice rheology to assess discrepancies versus the widely used Glen's flow law. A consistent implementation of the composite rheological Goldsby model requires to resolve grain size evolution.
 
-We implement the wattmeter (e.g. [Austin and Evans (2007)](https://doi.org/10.1130/G23244A.1)) to predict grain size evolution as a function of grain growth and grain reduction parameters for 1D and future 2D and 3D ice flow applications. In our model we reformulate the experimentally parameterized flow law relation using an effective viscosity approach as a function of the second stress or strain-rate invariants.
+We implement the wattmeter ([Austin and Evans, 2007](https://doi.org/10.1130/G23244A.1)) to predict grain size evolution as a function of grain growth and grain reduction parameters for 1D and future 2D and 3D ice flow applications. In our model we reformulate the experimentally parameterized flow law relation using an effective viscosity approach as a function of the second stress or strain-rate invariants.
 
 # Content
 * [Benchmark](#benchmark)
