@@ -45,8 +45,7 @@ const s2yr = 3600*24*365.25
     return m_gbs, n_gbs, n_disl
 end
    
-@views function compute_GSE_Tau!(dd, d, r_d, d_o, η, η_gbs, η_disl, Tii2, τxz, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, gam, p, c, dt, R, errd, fact, steady)
-    # GSE
+@views function compute_GSE_Tau!(dd, d, r_d, d_o, η_gbs, η_disl, Tii2, τxz, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, gam, p, c, dt, R, fact, steady, rel_d, dtau_d)
     Tii        = sqrt.(Tii2)
     T_h        = T .+ ph.*P  # T_h: melting point adjusted temperature[K]
     Eii_gbs    = Tii./(fact*η_gbs)
@@ -54,9 +53,8 @@ end
     if steady==true
         Eii        = Eii_gbs + Eii_disl
         β          = Eii_disl./Eii; β[end] = 0.0
-        rel   = 5e-1
-        d_p   = ((Kgg.*exp.(.-Qgg./(R.*T_h)).*(1.0/p).*c.*gam) ./ ((λ_gbs .- β*λ_gbs .+ β.*λ_disl).*Tii.*Eii)).^(1.0./(1.0+p))    
-        d    .= rel*d_p .+ (1-rel)*d
+        d_p   = ((Kgg.*exp.(.-Qgg./(R.*T_h)).*(1.0/p).*c.*gam) ./ ((λ_gbs .- β*λ_gbs .+ β.*λ_disl).*Tii.*Eii)).^(1.0./(1.0+p))
+        d    .= rel_d*d_p .+ (1-rel_d)*d
         ddn   = d_p .- d
         errd  = mean(abs.(ddn[2:end-1]))
     else
@@ -71,12 +69,11 @@ end
         dgg      =  p.^(-1).*d.^(1-p).*Kgg.*exp.(.-Qgg./R./T_h)           # d grain growth eq. (4)
         # Grain size evolution residual
         # d       .= d .+ dt.*(dgg .+ dred)
-        # rel      = 0.0001
+        # rel_d    = 0.0001
         # d_p      = d_o .+ dt.*(dgg .+ dred)
-        # d       .= rel*d_p .+ (1-rel)*d
-        dtau_d   = 0.08*s2yr
+        # d       .= rel_d*d_p .+ (1-rel_d)*d
         r_d2     = d_o./dt .+ (dgg .+ dred)
-        dd      .= 0.5*dd .+ 0.5*r_d2   # Crank-Nicolson here on "numerica"
+        dd      .= 0.5*dd .+ 0.5*r_d2   # Crank-Nicolson here on "numerics"
         d       .= (d .+ dtau_d.*dd)./(1.0 .+ dtau_d/dt)
         r_d     .= .-(d.-d_o)./dt .+ (dgg .+ dred)
         errd  = mean(abs.(r_d*dt))
@@ -99,8 +96,8 @@ end
     Eii_Behn = zeros(size(T))
     errd   = 2.0
     while errd>1e-10
-        Eii_gbs   = A1o.*(dB.^-1.4).*((Txz_Behn./1e6./fact).^n1).*exp.(-Q1./(R.*T)); #gbs
-        Eii_disl  = A2o.*(            (Txz_Behn./1e6./fact).^n2).*exp.(-Q2./(R.*T)); #disl
+        Eii_gbs   = A1o.*(dB.^-1.4).*((Txz_Behn./1e6./fact).^n1).*exp.(-Q1./(R.*T)) #gbs
+        Eii_disl  = A2o.*(            (Txz_Behn./1e6./fact).^n2).*exp.(-Q2./(R.*T)) #disl
         Eii_Behn .= Eii_gbs + Eii_disl
         β         = Eii_disl./Eii_Behn; β[end] = 0.0
         η_Behn   .= Txz_Behn./fact./Eii_Behn
@@ -114,12 +111,12 @@ end
     return Txz_Behn, Eii_Behn, η_Behn, dB, Vx_Behn
 end
 
-@views function load_data!(T2, dat_file)
+@views function load_data!(T2, dat_file, skip)
     data  = load(dat_file)
     Depth = data["depth"]
     Temp  = data["temp"]
-    Depth = [0.0;    Depth]
-    Temp  = [Temp[1]; Temp] .+ 273.15
+    Depth = [0.0;    Depth[1:end-skip]]
+    Temp  = [Temp[1]; Temp[1:end-skip]] .+ 273.15
     zv2   = LinRange(Depth[1], Depth[end], length(T2))
     itp1  = interpolate((Depth[:],), Temp[:], Gridded(Linear()))
     T2   .= reverse(itp1(zv2))
@@ -127,10 +124,10 @@ end
 end
 
 @views function ice_column1D()
-    steady = true
+    steady = false
     # physics
     fact   = 1.0
-    H      = 3e3         # domain height [m]
+    # H      = 3e3         # domain height [m]
     α      = 0.11*π/180  # slope angle   [rad]
     ρ      = 930         # ice density   [kg/m^3]
     g      = -9.81       # grav. accel.  [m/s^2]
@@ -144,8 +141,8 @@ end
     P0     = 1e7*0       # [Pa]
     ph     = 7e-8        # pressure heating coef [K/Pa]
     d_i    = 3e-3        # grain size [m]
-    dt     = 1000*s2yr   # physical time step value in seconds
-    nt     = 1           # number of time steps
+    dt     = 2e5*s2yr   # physical time step value in seconds
+    nt     = 5          # number of time steps
     # GSE - From Behn et al. 2021
     λ_disl = 0.01        # fitting param
     λ_gbs  = 0.01        # fitting param
@@ -155,15 +152,19 @@ end
     p      = 6.03        # grain growth exponant
     c      = 3.0         # geometric factor
     # numerics
-    ϵ_bg   = 1e-15       # background strain-rate [1/s]
+    ϵ_bg   = 1e-16       # background strain-rate [1/s]
     nz     = 300
     rel    = 1e-3
     nout   = 1e3
     tol    = 1e-5
     iterMax = 5e5
     # numerics gse
-    litMax = 1e2
-    tolg   = 1e-15
+    dtau_d = 10.0*s2yr   # when steady = false
+    rel_d  = 1e-1        # when steady = true
+    # load and interpolate data
+    T      =  zeros(nz+1)
+    ztop, zbot = load_data!(T, "./data_gisp2.jld", 2)
+    H      = zbot - ztop
     # derived numerics
     dz     = H/nz
     damp   = 1.0-0.1/nz
@@ -181,34 +182,27 @@ end
     η_disl = zeros(nz+1)
     r_d    = zeros(nz+1)
     dd     = zeros(nz+1)
-    # load and interpolate data
-    T      =  zeros(nz+1)
-    ztop, zbot = load_data!(T, "./data_gisp2.jld")
-    # @show((ztop, zbot, T[1], T[end]))
-    # error("stop")
     # initial conditions
     zc     = LinRange(-zbot+dz/2, ztop-dz/2, nz  )
     zv     = LinRange(-zbot     , ztop     , nz+1)
-    # display(plot(T,zv))
-    # error("stop")
     ηv     =  η0.*ones(nz+1)
     η_p    =  η0.*ones(nz+1)
     d      = d_i.*ones(nz+1)
     P      =  P0.*ones(nz+1)
     d_o   .= d
-    global m_gbs, n_gbs, n_disl, C_gbs, C_disl
+    global m_gbs, n_gbs, n_disl
     # time loop
     for it = 1:nt
-        d_o     .= d # uncomment if steady Grain-size is wanted
+        d_o     .= d
         iter = 1; err = 2*tol; errd = err
-        while err>tol && iter<iterMax
+        while (err>tol || errd>tol) && iter<iterMax
             ϵxz     .= 0.5.*diff(Vxe)/dz .+ ϵ_bg
             m_gbs, n_gbs, n_disl = compute_rheol_Tau!(η_p, η_gbs, η_disl, d, Tii2, T, P, ph, R, fact)
             # η_p     .= 0.5.*a0.^(.-1.0./npow).*Eii2.^mpow.*exp.(Q0./(npow.*R.*T))
             ηv      .= rel.*η_p .+ (1.0-rel).*ηv
             τxz     .= fact*ηv.*ϵxz
             Tii2    .= τxz.^2
-            errd = compute_GSE_Tau!(dd, d, r_d, d_o, η_p, η_gbs, η_disl, Tii2, τxz, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, gam, p, c, dt, R, errd, fact, steady)
+            errd = compute_GSE_Tau!(dd, d, r_d, d_o, η_gbs, η_disl, Tii2, τxz, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, gam, p, c, dt, R, fact, steady, rel_d, dtau_d)
             Fx      .= diff(τxz)/dz .- ρ.*g.*sin(α)
             dVxdτ   .= 0.5*dVxdτ .+ 0.5.*(Fx .+ dVxdτ*damp) # Crank-Nicolson here
             dτVx    .= dz.*dz./(0.5.*(ηv[1:end-1].+ηv[2:end]))./2.1
@@ -217,7 +211,7 @@ end
             Vxe[end] =  Vxe[end-1]
             if mod(iter, nout)==0
                 err  = norm(Fx)/length(Fx)
-                @printf("it=%d, iter %d, %2.2e, %2.2e, %1.3f, %1.3f\n", it, iter, err, errd, minimum(d)*1e3, maximum(d)*1e3)
+                @printf("it=%d, iter=%d, err=%2.2e, errd=%2.2e, gse=[%1.3f, %1.3f]\n", it, iter, err, errd, minimum(d)*1e3, maximum(d)*1e3)
             end
             iter += 1
         end
@@ -227,7 +221,7 @@ end
         p1 = plot(Vxe[2:end-1]*s2yr, zc, linewidth=:3.0, framestyle=:box, xlabel="Vx [m/yr]", ylabel="depth [m]", label="This study")
              plot!(Vx_Behn[1:10:end]*s2yr, zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21", legend=:topleft)
         p2 = plot(log10.(ϵxz), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(ϵxz) [1/s]", label="This study")
-             plot!(log10.(Eii_Behn[1:10:end]), zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
+             plot!(log10.(Eii_Behn)[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
         p3 = plot(1e-6*τxz, zv, linewidth=:3.0, framestyle=:box, xlabel="τxz [MPa]", label="This study")
              plot!(1e-6*Txz_Behn[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
         p4 = plot(log10.(ηv), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(η) [Pa.s]", ylabel="depth [m]", label="This study")

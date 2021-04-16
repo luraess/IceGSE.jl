@@ -45,8 +45,7 @@ const s2yr = 3600*24*365.25
     return m_gbs, n_gbs, n_disl
 end
    
-@views function compute_GSE_Tau!(dd, d, r_d, d_o, η, η_gbs, η_disl, Tii2, τxz, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, gam, p, c, dt, R, errd, fact, steady)
-    # GSE
+@views function compute_GSE_Tau!(dd, d, r_d, d_o, η_gbs, η_disl, Tii2, τxz, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, gam, p, c, dt, R, fact, steady, rel_d, dtau_d)
     Tii        = sqrt.(Tii2)
     T_h        = T .+ ph.*P  # T_h: melting point adjusted temperature[K]
     Eii_gbs    = Tii./(fact*η_gbs)
@@ -54,10 +53,9 @@ end
     if steady==true
         Eii        = Eii_gbs + Eii_disl
         β          = Eii_disl./Eii; β[end] = 0.0
-        rel   = 5e-1
-        d_p   = ((Kgg.*exp.(.-Qgg./(R.*T_h)).*(1.0/p).*c.*gam) ./ ((λ_gbs .- β*λ_gbs .+ β.*λ_disl).*Tii.*Eii)).^(1.0./(1.0+p))    
-        d    .= rel*d_p .+ (1-rel)*d
-        ddn   = d_p .- d       # normalized grain size difference
+        d_p   = ((Kgg.*exp.(.-Qgg./(R.*T_h)).*(1.0/p).*c.*gam) ./ ((λ_gbs .- β*λ_gbs .+ β.*λ_disl).*Tii.*Eii)).^(1.0./(1.0+p))
+        d    .= rel_d*d_p .+ (1-rel_d)*d
+        ddn   = d_p .- d
         errd  = mean(abs.(ddn[2:end-1]))
     else
         # work
@@ -71,12 +69,11 @@ end
         dgg      =  p.^(-1).*d.^(1-p).*Kgg.*exp.(.-Qgg./R./T_h)           # d grain growth eq. (4)
         # Grain size evolution residual
         # d       .= d .+ dt.*(dgg .+ dred)
-        # rel      = 0.0001
+        # rel_d    = 0.0001
         # d_p      = d_o .+ dt.*(dgg .+ dred)
-        # d       .= rel*d_p .+ (1-rel)*d
-        dtau_d   = 0.08*s2yr
+        # d       .= rel_d*d_p .+ (1-rel_d)*d
         r_d2     = d_o./dt .+ (dgg .+ dred)
-        dd      .= 0.5*dd .+ 0.5*r_d2   # Crank-Nicolson here on "numerica"
+        dd      .= 0.5*dd .+ 0.5*r_d2   # Crank-Nicolson here on "numerics"
         d       .= (d .+ dtau_d.*dd)./(1.0 .+ dtau_d/dt)
         r_d     .= .-(d.-d_o)./dt .+ (dgg .+ dred)
         errd  = mean(abs.(r_d*dt))
@@ -99,8 +96,8 @@ end
     Eii_Behn = zeros(size(T))
     errd   = 2.0
     while errd>1e-10
-        Eii_gbs   = A1o.*(dB.^-1.4).*((Txz_Behn./1e6./fact).^n1).*exp.(-Q1./(R.*T)); #gbs
-        Eii_disl  = A2o.*(            (Txz_Behn./1e6./fact).^n2).*exp.(-Q2./(R.*T)); #disl
+        Eii_gbs   = A1o.*(dB.^-1.4).*((Txz_Behn./1e6./fact).^n1).*exp.(-Q1./(R.*T)) #gbs
+        Eii_disl  = A2o.*(            (Txz_Behn./1e6./fact).^n2).*exp.(-Q2./(R.*T)) #disl
         Eii_Behn .= Eii_gbs + Eii_disl
         β         = Eii_disl./Eii_Behn; β[end] = 0.0
         η_Behn   .= Txz_Behn./fact./Eii_Behn
@@ -132,7 +129,7 @@ end
     P0     = 1e7*0       # [Pa]
     ph     = 7e-8        # pressure heating coef [K/Pa]
     d_i    = 3e-3        # grain size [m]
-    dt     = 1000*s2yr   # physical time step value in seconds
+    dt     = 1e3*s2yr    # physical time step value in seconds
     nt     = 10          # number of time steps
     # GSE - From Behn et al. 2021
     λ_disl = 0.01        # fitting param
@@ -150,8 +147,8 @@ end
     tol    = 1e-5
     iterMax = 5e5
     # numerics gse
-    litMax = 1e2
-    tolg   = 1e-15
+    dtau_d = 0.08*s2yr   # when steady = false
+    rel_d  = 5e-1        # when steady = true
     # derived numerics
     dz     = H/nz
     damp   = 1.0-0.1/nz
@@ -178,19 +175,19 @@ end
     d      = d_i.*ones(nz+1)
     P      =  P0.*ones(nz+1)
     d_o   .= d
-    global m_gbs, n_gbs, n_disl, C_gbs, C_disl
+    global m_gbs, n_gbs, n_disl
     # time loop
     for it = 1:nt
         d_o     .= d # uncomment if steady Grain-size is wanted
         iter = 1; err = 2*tol; errd = err
-        while err>tol && iter<iterMax
+        while (err>tol || errd>tol) && iter<iterMax
             ϵxz     .= 0.5.*diff(Vxe)/dz .+ ϵ_bg
             m_gbs, n_gbs, n_disl = compute_rheol_Tau!(η_p, η_gbs, η_disl, d, Tii2, T, P, ph, R, fact)
             # η_p     .= 0.5.*a0.^(.-1.0./npow).*Eii2.^mpow.*exp.(Q0./(npow.*R.*T))
             ηv      .= rel.*η_p .+ (1.0-rel).*ηv
             τxz     .= fact*ηv.*ϵxz
             Tii2    .= τxz.^2
-            errd = compute_GSE_Tau!(dd, d, r_d, d_o, η_p, η_gbs, η_disl, Tii2, τxz, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, gam, p, c, dt, R, errd, fact, steady)
+            errd = compute_GSE_Tau!(dd, d, r_d, d_o, η_gbs, η_disl, Tii2, τxz, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, gam, p, c, dt, R, fact, steady, rel_d, dtau_d)
             Fx      .= diff(τxz)/dz .- ρ.*g.*sin(α)
             dVxdτ   .= 0.5*dVxdτ .+ 0.5.*(Fx .+ dVxdτ*damp) # Crank-Nicolson here
             dτVx    .= dz.*dz./(0.5.*(ηv[1:end-1].+ηv[2:end]))./2.1
@@ -199,7 +196,7 @@ end
             Vxe[end] =  Vxe[end-1]
             if mod(iter, nout)==0
                 err  = norm(Fx)/length(Fx)
-                @printf("it=%d, iter %d, %2.2e, %2.2e, %1.3f, %1.3f\n", it, iter, err, errd, minimum(d)*1e3, maximum(d)*1e3)
+                @printf("it=%d, iter=%d, err=%2.2e, errd=%2.2e, gse=[%1.3f, %1.3f]\n", it, iter, err, errd, minimum(d)*1e3, maximum(d)*1e3)
             end
             iter += 1
         end
@@ -216,7 +213,7 @@ end
              plot!(log10.(η_Behn)[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21", legend=:bottomright)
         p5 = plot(1e3*d, zv, linewidth=:3.0, framestyle=:box, xlabel="d [mm]", label="This study")
              plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21", legend=:bottomright)
-        display(plot(p1, p2, p4, p5)) # background_color=:transparent, foreground_color=:gray
+        display(plot(p1, p2, p4, p5, background_color=:transparent, foreground_color=:gray))
     end
     # savefig("ice_column1D_GSE_Tii.png")
     return
