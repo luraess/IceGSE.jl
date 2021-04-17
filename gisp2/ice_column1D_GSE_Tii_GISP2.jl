@@ -74,9 +74,9 @@ end
         # d       .= rel_d*d_p .+ (1-rel_d)*d
         r_d2     = d_o./dt .+ (dgg .+ dred)
         dd      .= 0.5*dd .+ 0.5*r_d2   # Crank-Nicolson here on "numerics"
-        d       .= (d .+ dtau_d.*dd)./(1.0 .+ dtau_d/dt)
+        d       .= (d .+ dtau_d.*dd)./(1.0 .+ dtau_d./dt)
         r_d     .= .-(d.-d_o)./dt .+ (dgg .+ dred)
-        errd  = mean(abs.(r_d*dt))
+        errd  = mean(abs.(r_d.*dt))
     end
     return errd
 end
@@ -111,16 +111,24 @@ end
     return Txz_Behn, Eii_Behn, η_Behn, dB, Vx_Behn
 end
 
-@views function load_data!(T2, dat_file, skip)
-    data  = load(dat_file)
-    Depth = data["depth"]
-    Temp  = data["temp"]
-    Depth = [0.0;    Depth[1:end-skip]]
-    Temp  = [Temp[1]; Temp[1:end-skip]] .+ 273.15
-    zv2   = LinRange(Depth[1], Depth[end], length(T2))
-    itp1  = interpolate((Depth[:],), Temp[:], Gridded(Linear()))
-    T2   .= reverse(itp1(zv2))
-    return zv2[1], zv2[end]
+@views function load_data!(T, dat_file, A, dat_file2, skip)
+    data   = load(dat_file)
+    data2  = load(dat_file2)
+    Depth  = data["depth"]
+    Temp   = data["temp"]
+    Depth2 = data2["depth"]
+    Age    = data2["age"]
+    Depth  = [0.0;    Depth[1:end-skip]]
+    Temp   = [Temp[1]; Temp[1:end-skip]] .+ 273.15
+    zv     = LinRange(Depth[1], Depth[end], length(T))
+    itp1   = interpolate((Depth[:],), Temp[:], Gridded(Linear()))
+    T     .= reverse(itp1(zv))
+    Depth2 = [Depth[1]; Depth2; Depth[end]]
+    Age    = [1       ; Age   ;   Age[end]]
+    # @show(Depth2)
+    itp2   = interpolate((Depth2[:],), Age[:], Gridded(Linear()))
+    A     .= reverse(itp2(zv))
+    return zv[1], zv[end]
 end
 
 @views function ice_column1D()
@@ -141,8 +149,8 @@ end
     P0     = 1e7*0       # [Pa]
     ph     = 7e-8        # pressure heating coef [K/Pa]
     d_i    = 3e-3        # grain size [m]
-    dt     = 2e5*s2yr   # physical time step value in seconds
-    nt     = 5          # number of time steps
+    # dt     = 2e5*s2yr   # physical time step value in seconds
+    nt     = 1          # number of time steps
     # GSE - From Behn et al. 2021
     λ_disl = 0.01        # fitting param
     λ_gbs  = 0.01        # fitting param
@@ -163,7 +171,9 @@ end
     rel_d  = 1e-1        # when steady = true
     # load and interpolate data
     T      =  zeros(nz+1)
-    ztop, zbot = load_data!(T, "./data_gisp2.jld", 2)
+    dt     =  zeros(nz+1)
+    ztop, zbot = load_data!(T, "./data_gisp2.jld", dt, "./age_gisp2.jld", 1)
+    dt    .= dt*s2yr
     H      = zbot - ztop
     # derived numerics
     dz     = H/nz
