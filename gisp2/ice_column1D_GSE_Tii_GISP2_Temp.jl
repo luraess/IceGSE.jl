@@ -163,7 +163,7 @@ end
     rel_d  = 1e-1        # when steady = true
     # load and interpolate data
     T      =  zeros(nz+1)
-    ztop, zbot = load_data!(T, "./data_gisp2.jld", 2)
+    ztop, zbot = load_data!(T, "./data_gisp2.jld", 0)
     H      = zbot - ztop
     # derived numerics
     dz     = H/nz
@@ -230,7 +230,7 @@ end
              plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21", legend=:bottomright)
         display(plot(p1, p2, p4, p5, background_color=:transparent, foreground_color=:gray))
     end
-    # savefig("ice_column1D_GSE_Tii_gisp2.png")
+    savefig("ice_column1D_GSE_Tii_gisp2_Temp.png")
     return
 end
 
