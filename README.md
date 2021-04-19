@@ -47,10 +47,11 @@ The initial temperature and age profiles are taken from [Clow et al. (1999)](htt
 
 ![](docs/ice_column1D_GSE_Tii_gisp2_initial.png)
 
-🚧 **work in progress**
-- figure out the exact fitting parameters (`kgg` and others) used by Behn et al. to reproduce their **GSE application**
-- temperature-dependant rheology has a region T>259 K close to the base which seems not to be captured by Behn's results
-- add shear-heating for better fit ...
+## 🚧 Work in progress
+
+- Figure out the exact fitting parameters (`kgg` and others) used by Behn et al. to reproduce their **GSE application**
+- Temperature-dependant rheology has a region T>259 K close to the base which seems not to be captured by Behn's results
+- Add shear-heating for better fit ...
 
 # References
 [Austin, N. J., Evans, B. (2007). Paleowattmeters: A scaling relation for dynamically recrystallized grain size. Geology 35 (4): 343–346, https://doi.org/10.1130/G23244A.1.](https://doi.org/10.1130/G23244A.1)
