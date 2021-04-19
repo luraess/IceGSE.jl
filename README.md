@@ -28,7 +28,8 @@ The symbolic math derivation of "experimental to model" formulation is done in t
 ### GSE application
 The [**gisp2**](gisp2) folder contains the codes to reproduce the ice core data configuration (see [Section 3.4](https://doi.org/10.5194/tc-2020-295)):
 - [`ice_column1D_fixGS_Tii_GISP2.jl`](benchmark/ice_column1D_fixGS_Tii_GISP2.jl) a composite rheology (GBS and dislocation creep) version with stress dependent viscosity η(τII), fixed grain size and temperature data for the GISP2 setup.
-- [`ice_column1D_GSE_Tii_GISP2.jl`](gisp2/ice_column1D_GSE_Tii_GISP2.jl) a composite rheology (GBS and dislocation creep) version with stress dependent viscosity η(τII), grain size evolution, temperature data for the GISP2 setup and depth-dependent age
+- [`ice_column1D_GSE_Tii_GISP2_Temp.jl`](gisp2/ice_column1D_GSE_Tii_GISP2_Temp.jl) a composite rheology (GBS and dislocation creep) version with stress dependent viscosity η(τII), grain size evolution and temperature data for the GISP2 setup.
+- [`ice_column1D_GSE_Tii_GISP2.jl`](gisp2/ice_column1D_GSE_Tii_GISP2.jl) a composite rheology (GBS and dislocation creep) version with stress dependent viscosity η(τII), grain size evolution, temperature and depth-dependent age data for the for the GISP2 setup. Spatial (depth) age variability is implemented using a variable `dt` vector further used to converge a single time step with data-obtained age data.
 
 ## Results
 
@@ -46,7 +47,10 @@ The initial temperature and age profiles are taken from [Clow et al. (1999)](htt
 
 ![](docs/ice_column1D_GSE_Tii_gisp2_initial.png)
 
-🚧 
+🚧 **work in progress**
+- figure out the exact fitting parameters (`kgg` and others) used by Behn et al. to reproduce their **GSE application**
+- temperature-dependant rheology has a region T>259 K close to the base which seems not to be captured by Behn's results
+- add shear-heating for better fit ...
 
 # References
 [Austin, N. J., Evans, B. (2007). Paleowattmeters: A scaling relation for dynamically recrystallized grain size. Geology 35 (4): 343–346, https://doi.org/10.1130/G23244A.1.](https://doi.org/10.1130/G23244A.1)
