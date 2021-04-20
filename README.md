@@ -43,7 +43,7 @@ We implemented the parameters and configuration from the 1D ice core data case (
 
 ![](docs/ice_column1D_GSE_Tii_gisp2.png)
 
-The initial temperature and age profiles are taken from [Clow et al. (1999)](https://doi.org/10.1594/PANGAEA.55517) and [Ram et al. (2000)](https://doi.org/10.1029/2000JD900321), respectively.
+The initial temperature, age and grain size distribution profiles are taken from [Clow et al. (1999)](https://doi.org/10.1594/PANGAEA.55517), [Ram et al. (2000)](https://doi.org/10.1029/2000JD900321) and [Gow et al. 1997](https://doi.org/10.1029/97JC00165), respectively:
 
 ![](docs/ice_column1D_GSE_Tii_gisp2_initial.png)
 
@@ -59,6 +59,8 @@ The initial temperature and age profiles are taken from [Clow et al. (1999)](htt
 [Behn, M. D., Goldsby, D. L., and Hirth, G. (2020). The role of grain-size evolution on the rheology of ice: Implications for reconciling laboratory creep data and the Glen flow law, The Cryosphere Discuss. \[preprint\], https://doi.org/10.5194/tc-2020-295, in review.](https://doi.org/10.5194/tc-2020-295)
 
 [Clow, G.D. (1999). GISP2-D Temperature. PANGAEA, https://doi.org/10.1594/PANGAEA.55517](https://doi.org/10.1594/PANGAEA.55517)
+
+[Gow, A. J., Meese, D. A., Alley, R. B., Fitzpatrick, J. J., Anandakrishnan, S., Woods, G. A., and Elder, B. C. (1997), Physical and structural properties of the Greenland Ice Sheet Project 2 ice core: A review, J. Geophys. Res., 102( C12), 26559– 26575, doi:10.1029/97JC00165.](https://doi.org/10.1029/97JC00165)
 
 [Ram, M., Donarummo, J., Stolz, M. R. and Koenig, G. (2000). Calibration of laser-light scattering measurements of dust concentration for Wisconsinan GISP2 ice using instrumental neutron activation analysis of aluminum: Results and discussion, J. Geophys. Res., 105(D20), 24731–24738, doi:10.1029/2000JD900321.](https://doi.org/10.1029/2000JD900321)
 
