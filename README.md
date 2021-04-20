@@ -60,6 +60,6 @@ The initial temperature and age profiles are taken from [Clow et al. (1999)](htt
 
 [Clow, G.D. (1999). GISP2-D Temperature. PANGAEA, https://doi.org/10.1594/PANGAEA.55517](https://doi.org/10.1594/PANGAEA.55517)
 
-[Ram, M., Donarummo, J., Stolz, M. R. and Koenig, G. (2000). Calibration of laser-light scattering measurements of dust concentration for Wisconsinan GISP2 ice using instrumental neutron activation analysis of aluminum: Results and discussion, J. Geophys. Res., 105(D20), 24731–24738, doi:10.1029/2000JD900321, 2000.](https://doi.org/10.1029/2000JD900321)
+[Ram, M., Donarummo, J., Stolz, M. R. and Koenig, G. (2000). Calibration of laser-light scattering measurements of dust concentration for Wisconsinan GISP2 ice using instrumental neutron activation analysis of aluminum: Results and discussion, J. Geophys. Res., 105(D20), 24731–24738, doi:10.1029/2000JD900321.](https://doi.org/10.1029/2000JD900321)
 
 [Julia]: https://julialang.org
