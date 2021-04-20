@@ -148,12 +148,12 @@ end
     mpow   = -(1.0-1.0/npow)/2.0
     P0     = 1e7*0       # [Pa]
     ph     = 7e-8        # pressure heating coef [K/Pa]
-    d_i    = 3e-3        # grain size [m]
+    d_i    = 2e-3        # grain size [m]
     # dt     = 2e5*s2yr   # physical time step value in seconds
     nt     = 1          # number of time steps
     # GSE - From Behn et al. 2021
-    λ_disl = 0.01        # fitting param
-    λ_gbs  = 0.01        # fitting param
+    λ_disl = 0.03        # fitting param
+    λ_gbs  = 0.03        # fitting param
     Qgg    = 42e3        # grain growth activation energy
     Kgg    = 1.02e-17    # grain growth prefactor !! units
     gam    = 0.065       # param
@@ -175,6 +175,10 @@ end
     ztop, zbot = load_data!(T, "./data_gisp2.jld", dt, "./age_gisp2.jld", 0)
     dt    .= dt*s2yr
     H      = zbot - ztop
+    # AL4 Azuma with T fit
+    # p      = 6.9
+    # k_A    = (5.37e-8.^(1/p)*1e-3).^p
+    # Kgg    = k_A./exp.(.-Qgg./R./T) # m^n s^-1
     # derived numerics
     dz     = H/nz
     damp   = 1.0-0.1/nz
