@@ -195,9 +195,12 @@ end
     # initial conditions
     zc     = LinRange(-zbot+dz/2, ztop-dz/2, nz  )
     zv     = LinRange(-zbot     , ztop     , nz+1)
+    gisp2  = load("gisp_data.jld")
+    gisp2  = gisp2["gisp2_gs"]
     # p1 = plot(T, zv, legend=false, linewidth=:3.0, framestyle=:box, xlabel="T [K]", ylabel="depth [m]")
     # p2 = plot(dt/s2yr/1e3, zv, legend=false, linewidth=:3.0, framestyle=:box, xlabel="Age [kyrs]")
-    # display(plot(p1, p2, background_color=:transparent, foreground_color=:gray))
+    # p3 = plot(gisp2[:,2], .-gisp2[:,1], legend=false, linewidth=:0.0, markershape=:circle, markersize=5, framestyle=:box, xlabel="grain size [mm]")
+    # display(plot(p1, p2, p3, layout=(1,3), background_color=:transparent, foreground_color=:gray))
     # savefig("ice_column1D_GSE_Tii_gisp2_initial.png")
     # error("Display initial conditions")
     ηv     =  η0.*ones(nz+1)
@@ -232,6 +235,8 @@ end
         end
         # Behn et al.
         Txz_Behn, Eii_Behn, η_Behn, dB, Vx_Behn = check_Behn(T, zv, d_i, λ_disl, λ_gbs, Kgg, Qgg, R, gam, p, c, ρ, g, α, dz, fact)
+        data_Behn  = load("behn_gisp_fit.jld")
+        data_Behn  = data_Behn["behn_gisp2_fit"]
         # visualisation
         p1 = plot(Vxe[2:end-1]*s2yr, zc, linewidth=:3.0, framestyle=:box, xlabel="Vx [m/yr]", ylabel="depth [m]", label="This study", legend=:topleft, foreground_color_legend = nothing)
             #  plot!(Vx_Behn[1:10:end]*s2yr, zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
@@ -241,8 +246,10 @@ end
             #  plot!(1e-6*Txz_Behn[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
         p4 = plot(log10.(ηv), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(η) [Pa.s]", ylabel="depth [m]", label="This study", legend=:bottomright, foreground_color_legend = nothing)
             #  plot!(log10.(η_Behn)[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
-        p5 = plot(1e3*d, zv, linewidth=:3.0, framestyle=:box, xlabel="d [mm]", label="This study", legend=:bottomright, foreground_color_legend = nothing)
-            #  plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21)
+        p5 = plot(1e3*d, zv, linewidth=:3.0, framestyle=:box, xlabel="d [mm]", label="This study", legend=:topright, foreground_color_legend = nothing)
+             plot!(data_Behn[:,2], .-data_Behn[:,1], linewidth=:3.0, label="Behn et al. 2021")
+             plot!(gisp2[:,2], .-gisp2[:,1], linewidth=:0.0, markershape=:circle, markersize=3, framestyle=:box,label="Gow et al. 1997")
+            #  plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
         display(plot(p1, p2, p4, p5, background_color=:transparent, foreground_color=:gray))
     end
     # savefig("ice_column1D_GSE_Tii_gisp2.png")
