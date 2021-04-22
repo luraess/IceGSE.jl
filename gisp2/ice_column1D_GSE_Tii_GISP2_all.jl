@@ -155,100 +155,100 @@ end
 end
 
 @views function ice_column1D()
-    steady = false
+    steady    = false
     # physics
-    fact   = 2.0
-    # H      = 3e3         # domain height [m]
-    α      = 0.11*π/180  # slope angle   [rad]
-    ρ      = 930         # ice density   [kg/m^3]
-    g      = -9.81       # grav. accel.  [m/s^2]
-    η0     = 1e15        # ice viscosity [Pa.s]
-    Ti     = 253         # ice temp.     [K]
-    R      = 8.314       # gas constant
-    Q0     = 6*1e4       # activation energy
-    a0     = 8.75*1e-13  # prefactor
-    npow   = 3.0         # power-law exponent
-    mpow   = -(1.0-1.0/npow)/2.0
-    G      = 3.5e9       # Elastic modulus (E/1+nu/2 = 1e9/(1+0.3)/2)
-    Coh    = 1e7         # Von Mises yield
-    ϕ      = 0*π/180    # friction angel
-    P0     = 1e7*0       # [Pa]
-    ph     = 7e-8        # pressure heating coef [K/Pa]
-    d_i    = 2e-3        # grain size [m]
-    # dt     = 2e5*s2yr   # physical time step value in seconds
-    nt     = 1          # number of time steps
+    fact      = 2.0
+    # H         = 3e3         # domain height [m]
+    α         = 0.11*π/180  # slope angle   [rad]
+    ρ         = 930         # ice density   [kg/m^3]
+    g         = -9.81       # grav. accel.  [m/s^2]
+    η0        = 1e15        # ice viscosity [Pa.s]
+    Ti        = 253         # ice temp.     [K]
+    R         = 8.314       # gas constant
+    Q0        = 6*1e4       # activation energy
+    a0        = 8.75*1e-13  # prefactor
+    npow      = 3.0         # power-law exponent
+    mpow      = -(1.0-1.0/npow)/2.0
+    G         = 3.5e9       # Elastic modulus (E/1+nu/2 = 1e9/(1+0.3)/2)
+    Coh       = 1e7         # Von Mises yield
+    ϕ         = 0*π/180    # friction angel
+    P0        = 1e7*0       # [Pa]
+    ph        = 7e-8        # pressure heating coef [K/Pa]
+    d_i       = 2e-3        # grain size [m]
+    # dt        = 2e5*s2yr   # physical time step value in seconds
+    nt        = 1          # number of time steps
     # GSE - From Behn et al. 2021
-    λ_disl = 0.03        # fitting param
-    λ_gbs  = 0.03        # fitting param
-    Qgg    = 42e3        # grain growth activation energy
-    Kgg    = 1.02e-17    # grain growth prefactor !! units
-    gam    = 0.065       # param
-    p      = 6.03        # grain growth exponant
-    c      = 3.0         # geometric factor
+    λ_disl    = 0.03        # fitting param
+    λ_gbs     = 0.03        # fitting param
+    Qgg       = 42e3        # grain growth activation energy
+    Kgg       = 1.02e-17    # grain growth prefactor !! units
+    gam       = 0.065       # param
+    p         = 6.03        # grain growth exponant
+    c         = 3.0         # geometric factor
     # numerics
-    ϵ_bg   = 1e-16       # background strain-rate [1/s]
-    nz     = 300
-    rel    = 1e-3
-    nout   = 1e3
-    tol    = 1e-5
-    iterMax = 5e5
+    ϵ_bg      = 1e-16       # background strain-rate [1/s]
+    nz        = 300
+    rel       = 1e-3
+    nout      = 1e3
+    tol       = 1e-5
+    iterMax   = 5e5
     # numerics gse
-    dtau_d = 10.0*s2yr   # when steady = false
-    rel_d  = 1e-1        # when steady = true
+    dtau_d    = 10.0*s2yr   # when steady = false
+    rel_d     = 1e-1        # when steady = true
     # load and interpolate data
-    T      =  zeros(nz+1)
-    dt     =  zeros(nz+1)
+    T         =  zeros(nz+1)
+    dt        =  zeros(nz+1)
     ztop, zbot = load_data!(T, "./data_gisp2.jld", dt, "./age_gisp2.jld", 0)
-    dt    .= dt*s2yr
-    H      = zbot - ztop
+    dt       .= dt*s2yr
+    H         = zbot - ztop
     # AL4 Azuma with T fit
-    # p      = 6.9
-    # k_A    = (5.37e-8.^(1/p)*1e-3).^p
-    # Kgg    = k_A./exp.(.-Qgg./R./T) # m^n s^-1
+    # p         = 6.9
+    # k_A       = (5.37e-8.^(1/p)*1e-3).^p
+    # Kgg       = k_A./exp.(.-Qgg./R./T) # m^n s^-1
     # derived numerics
-    dz     = H/nz
-    damp   = 1.0-0.1/nz
+    dz        = H/nz
+    damp      = 1.0-0.1/nz
     # array initialisation
-    d_o    = zeros(nz+1)
-    Vxe    = zeros(nz+2)
-    ϵxz    = zeros(nz+1)
-    τxz    = zeros(nz+1)
-    τxz_o  = zeros(nz+1)
-    Tii    =  ones(nz+1)
-    dVxdτ  = zeros(nz)
-    dτVx   = zeros(nz)
-    Fx     = zeros(nz)
-    η_diff = zeros(nz+1)
-    η_basal= zeros(nz+1)
-    η_gbs  = zeros(nz+1)
-    η_disl = zeros(nz+1)
-    Eii_diff = zeros(nz+1)
-    Eii_basal= zeros(nz+1)
-    Eii_gbs  = zeros(nz+1)
-    Eii_disl = zeros(nz+1)
-    Eii_el   = zeros(nz+1)
-    Eii_pl   = zeros(nz+1)
-    Eii    = zeros(nz+1)
-    r_d    = zeros(nz+1)
-    dd     = zeros(nz+1)
+    d_o       = zeros(nz+1)
+    Vxe       = zeros(nz+2)
+    ϵxz       = zeros(nz+1)
+    τxz       = zeros(nz+1)
+    τxz_o     = zeros(nz+1)
+    Tii       =  ones(nz+1)
+    dVxdτ     = zeros(nz)
+    dτVx      = zeros(nz)
+    Fx        = zeros(nz)
+    η_diff    = zeros(nz+1)
+    η_basal   = zeros(nz+1)
+    η_gbs     = zeros(nz+1)
+    η_disl    = zeros(nz+1)
+    Eii_diff  = zeros(nz+1)
+    Eii_basal = zeros(nz+1)
+    Eii_gbs   = zeros(nz+1)
+    Eii_disl  = zeros(nz+1)
+    Eii_el    = zeros(nz+1)
+    Eii_pl    = zeros(nz+1)
+    Eii       = zeros(nz+1)
+    r_d       = zeros(nz+1)
+    dd        = zeros(nz+1)
     # initial conditions
-    zc     = LinRange(-zbot+dz/2, ztop-dz/2, nz  )
-    zv     = LinRange(-zbot     , ztop     , nz+1)
-    gisp2  = load("gisp_data.jld")
-    gisp2  = gisp2["gisp2_gs"]
+    zc        = LinRange(-zbot+dz/2, ztop-dz/2, nz  )
+    zv        = LinRange(-zbot     , ztop     , nz+1)
+    gisp2     = load("gisp_data.jld")
+    gisp2     = gisp2["gisp2_gs"]
     # p1 = plot(T, zv, legend=false, linewidth=:3.0, framestyle=:box, xlabel="T [K]", ylabel="depth [m]")
     # p2 = plot(dt/s2yr/1e3, zv, legend=false, linewidth=:3.0, framestyle=:box, xlabel="Age [kyrs]")
     # p3 = plot(gisp2[:,2], .-gisp2[:,1], legend=false, linewidth=:0.0, markershape=:circle, markersize=5, framestyle=:box, xlabel="grain size [mm]")
     # display(plot(p1, p2, p3, layout=(1,3), background_color=:transparent, foreground_color=:gray))
     # savefig("ice_column1D_GSE_Tii_gisp2_initial.png")
     # error("Display initial conditions")
-    ηv     =  η0.*ones(nz+1)
-    η_p    =  η0.*ones(nz+1)
-    η_el   =  G.*dt
-    η_pl   =      ones(nz+1)
-    d      = d_i.*ones(nz+1)
-    P      =  P0.*ones(nz+1)
-    d_o   .= d
+    ηv        =  η0.*ones(nz+1)
+    η_p       =  η0.*ones(nz+1)
+    η_el      =  G.*dt
+    η_pl      =      ones(nz+1)
+    d         = d_i.*ones(nz+1)
+    P         =  P0.*ones(nz+1)
+    d_o      .= d
     global m_gbs, n_gbs, n_disl
     # time loop
     for it = 1:nt
