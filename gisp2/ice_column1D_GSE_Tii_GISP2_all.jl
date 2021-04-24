@@ -162,7 +162,7 @@ end
     npow      = 3.0         # power-law exponent
     mpow      = -(1.0-1.0/npow)/2.0
     G         = 3.5e9       # Elastic modulus (E/1+nu/2 = 1e9/(1+0.3)/2)
-    Coh       = 1e7         # Von Mises yield
+    Coh       = 6e4         # Von Mises yield
     ϕ         = 0*π/180    # friction angel
     P0        = 1e7*0       # [Pa]
     ph        = 7e-8        # pressure heating coef [K/Pa]
