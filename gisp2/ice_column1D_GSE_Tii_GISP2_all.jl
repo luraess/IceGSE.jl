@@ -103,11 +103,11 @@ end
     # Isolated viscosities
     η_diff    .= fact^(n_diff-1) .* B_diff .* Tii.^(1.0-n_diff ).*d.^m_diff
     η_basal   .= fact^(n_basal-1).* B_basal.* Tii.^(1.0-n_basal)
-    η_gbs     .= fact^(n_gbs-1)  .* B_gbs  .* Tii.^(1.0-n_gbs ).*d.^m_gbs
-    η_disl    .= fact^(n_disl-1) .* B_disl .* Tii.^(1.0-n_disl)
+    η_gbs     .= fact^(n_gbs-1)  .* B_gbs  .* Tii.^(1.0-n_gbs  ).*d.^m_gbs
+    η_disl    .= fact^(n_disl-1) .* B_disl .* Tii.^(1.0-n_disl )
     η_pl      .= (Coh*cos(ϕ) .+ P.*sin(ϕ))./fact./Eii
     # viscosity guess
-    η         .= 1.0./(1.0./η_diff .+ 1.0./(η_basal .+ η_gbs) .+ 1.0./η_disl .+ 1.0./η_el .+ 1.0./η_pl)
+    η         .= 1.0./(1.0./η_diff .+ 1.0./(η_basal .+ η_gbs) .+ 1.0./η_disl .+ 1.0./η_el .+ 0.0./η_pl)
     return
 end
    
@@ -116,8 +116,8 @@ end
     Eii_gbs    = Tii./(fact*η_gbs)
     Eii_disl   = Tii./(fact*η_disl)
     if steady==true
-        Eii        = Eii_gbs + Eii_disl
-        β          = Eii_disl./Eii; β[end] = 0.0
+        Eii   = Eii_gbs + Eii_disl
+        β     = Eii_disl./Eii; β[end] = 0.0
         d_p   = ((Kgg.*exp.(.-Qgg./(R.*T_h)).*(1.0/p).*c.*gam) ./ ((λ_gbs .- β*λ_gbs .+ β.*λ_disl).*Tii.*Eii)).^(1.0./(1.0+p))
         d    .= rel_d*d_p .+ (1-rel_d)*d
         ddn   = d_p .- d
@@ -162,7 +162,7 @@ end
     npow      = 3.0         # power-law exponent
     mpow      = -(1.0-1.0/npow)/2.0
     G         = 3.5e9       # Elastic modulus (E/1+nu/2 = 1e9/(1+0.3)/2)
-    Coh       = 6e4         # Von Mises yield
+    Coh       = 6e6         # Von Mises yield
     ϕ         = 0*π/180    # friction angel
     P0        = 1e7*0       # [Pa]
     ph        = 7e-8        # pressure heating coef [K/Pa]
@@ -236,13 +236,12 @@ end
     d         = d_i.*ones(nz+1)
     P         =  P0.*ones(nz+1)
     d_o      .= d
-    global m_gbs, n_gbs, n_disl
     # time loop
     for it = 1:nt
         d_o   .= d
         τxz_o .= τxz
-        iter = 1; err = 2*tol; errd = err
-        while (err>tol || errd>tol) && iter<iterMax
+        iter = 1; err = 2*tol
+        while err>tol && iter<iterMax
             ϵxz     .= 0.5.*diff(Vxe)/dz .+ ϵ_bg
             ϵxz1    .= ϵxz .+ τxz_o./(fact.*η_el)
             Eii     .= sqrt.(ϵxz.^2) # viscous only invariant for η_pl calculation
@@ -258,8 +257,10 @@ end
             Vxe[1]   = -Vxe[2]
             Vxe[end] =  Vxe[end-1]
             if mod(iter, nout)==0
-                err  = norm(Fx)/length(Fx)
-                @printf("it=%d, iter=%d, err=%2.2e, errd=%2.2e, gse=[%1.3f, %1.3f]\n", it, iter, err, errd, minimum(d)*1e3, maximum(d)*1e3)
+                errF = norm(Fx)/length(Fx)
+                errη = norm(abs.(η_p.-ηv)./η_p)./length(ηv)
+                err  = maximum([errF, errη, errd])
+                @printf("it=%d, iter=%d, errF=%2.2e, errη=%2.2e, errd=%2.2e, gse=[%1.3f, %1.3f]\n", it, iter, errF, errη, errd, minimum(d)*1e3, maximum(d)*1e3)
             end
             iter += 1
         end
@@ -275,8 +276,8 @@ end
         ϵxz_pl      = τxz./(fact.*η_pl)
         τxz_basal   = fact.*η_basal.*ϵxz_bas_gbs
         τxz_gbs     = fact.*η_gbs.*ϵxz_bas_gbs
-        @show(maximum(τxz .- (τxz_basal .+ τxz_gbs)))
-        @show(maximum(ϵxz .- (ϵxz_diff .+ ϵxz_bas_gbs .+ ϵxz_disl .+ ϵxz_el .+ ϵxz_pl)))
+        println(maximum( (τxz .- (τxz_basal .+ τxz_gbs))./mean(τxz) ))
+        println(maximum( (ϵxz1 .- (ϵxz_diff .+ ϵxz_bas_gbs .+ ϵxz_disl .+ ϵxz_el .+ 0*ϵxz_pl)) ))
         # p1 = plot(τxz[1:10:end],zv[1:10:end],label="τxz", linewidth=:0.0, markershape=:circle, markersize=4); plot!(τxz_basal,zv,label="τxz_basal"); plot!(τxz_gbs,zv,label="τxz_gbs"); 
         # display(plot(p1)); error("stop")
         Eii_diff    = sqrt.(ϵxz_diff.^2)
@@ -298,12 +299,12 @@ end
         #      plot!(gisp2[:,2], .-gisp2[:,1], linewidth=:0.0, markershape=:circle, markersize=3, framestyle=:box,label="Gow et al. 1997")
         #     #  plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
         # display(plot(p1, p2, p4, p5, background_color=:transparent, foreground_color=:gray))
-        
         p1 = plot(log10.(ϵxz_diff), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(ϵxz) [1/s]", ylabel="depth [m]", label="ϵxz_diff", legend=:bottomleft, foreground_color_legend = nothing)
             plot!(log10.(ϵxz_bas_gbs), zv, linewidth=:3.0, thickness_scaling = 1, label="ϵxz_bas_gbs")
             plot!(log10.(ϵxz_disl), zv, linewidth=:3.0, thickness_scaling = 1, label="ϵxz_disl")
             plot!(log10.(ϵxz_el), zv, linewidth=:3.0, label="ϵxz_el")
             plot!(log10.(ϵxz_pl), zv, linewidth=:3.0, label="ϵxz_pl")
+        # p1 = plot(log10.(abs.(η_p.-ηv)./η_p), zv, linewidth=:3.0, label="ϵrr_eta")
         display(plot(p1, background_color=:transparent, foreground_color=:gray))
         # savefig("ice_column1D_GSE_Tii_gisp2_exz.png")
     end
