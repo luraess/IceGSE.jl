@@ -47,14 +47,14 @@ end
     itp1   = interpolate((Depth[:],), Temp[:], Gridded(Linear()))
     T     .= reverse(itp1(zv))
     Depth2 = [Depth[1]; Depth2; Depth[end]]
-    Age    = [1       ; Age   ;   Age[end]]
+    Age    = [10      ; Age   ;   Age[end]]
     # @show(Depth2)
     itp2   = interpolate((Depth2[:],), Age[:], Gridded(Linear()))
     A     .= reverse(itp2(zv))
     return zv[1], zv[end]
 end
 
-@views function compute_rheol_Tau!(η, η_el, η_diff, η_basal, η_gbs, η_disl, d, Tii, T, P, ph, R, fact)
+@views function compute_rheol_Tau!(η, η_el, η_diff, η_basal, η_gbs, η_disl, d, Tii, T, P, ph, R, fact, do_elast)
     T_h        = T .+ ph.*P  # T_h: melting point adjusted temperature[K]
     # Diffusional Rheology (Goldsby and Kohlstedt 2001, eq.4 + Table 6)
     m_diff     = 2
@@ -103,20 +103,20 @@ end
     # Isolated viscosities
     η_diff    .= fact^(n_diff-1) .* B_diff .* Tii.^(1.0-n_diff ).*d.^m_diff
     η_basal   .= fact^(n_basal-1).* B_basal.* Tii.^(1.0-n_basal)
-    η_gbs     .= fact^(n_gbs-1)  .* B_gbs  .* Tii.^(1.0-n_gbs ).*d.^m_gbs
-    η_disl    .= fact^(n_disl-1) .* B_disl .* Tii.^(1.0-n_disl)
+    η_gbs     .= fact^(n_gbs-1)  .* B_gbs  .* Tii.^(1.0-n_gbs  ).*d.^m_gbs
+    η_disl    .= fact^(n_disl-1) .* B_disl .* Tii.^(1.0-n_disl )
     # viscosity guess
-    η         .= 1.0./(1.0./η_diff .+ 1.0./(η_basal .+ η_gbs) .+ 1.0./η_disl .+ 1.0./η_el)
+    η         .= 1.0./(1.0./η_diff .+ 1.0./(η_basal .+ η_gbs) .+ 1.0./η_disl .+ do_elast./η_el)
     return
 end
    
 @views function compute_GSE_Tau!(dd, d, r_d, d_o, η_gbs, η_disl, Tii, τxz, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, gam, p, c, dt, R, fact, steady, rel_d, dtau_d)
-    T_h        = T .+ ph.*P  # T_h: melting point adjusted temperature[K]
-    Eii_gbs    = Tii./(fact*η_gbs)
-    Eii_disl   = Tii./(fact*η_disl)
+    T_h       = T .+ ph.*P  # T_h: melting point adjusted temperature[K]
+    Eii_gbs   = Tii./(fact*η_gbs)
+    Eii_disl  = Tii./(fact*η_disl)
     if steady==true
-        Eii        = Eii_gbs + Eii_disl
-        β          = Eii_disl./Eii; β[end] = 0.0
+        Eii   = Eii_gbs + Eii_disl
+        β     = Eii_disl./Eii; β[end] = 0.0
         d_p   = ((Kgg.*exp.(.-Qgg./(R.*T_h)).*(1.0/p).*c.*gam) ./ ((λ_gbs .- β*λ_gbs .+ β.*λ_disl).*Tii.*Eii)).^(1.0./(1.0+p))
         d    .= rel_d*d_p .+ (1-rel_d)*d
         ddn   = d_p .- d
@@ -147,6 +147,8 @@ end
 
 @views function ice_column1D()
     steady    = false
+    do_elast  = false
+    do_plast  = false
     # physics
     fact      = 2.0
     # H         = 3e3         # domain height [m]
@@ -160,14 +162,14 @@ end
     a0        = 8.75*1e-13  # prefactor
     npow      = 3.0         # power-law exponent
     mpow      = -(1.0-1.0/npow)/2.0
-    G         = 3.5e9       # Elastic modulus (E/1+nu/2 = 1e9/(1+0.3)/2)
-    Coh       = 5.33e4         # Von Mises yield
+    G         = 3.5e7       # Elastic modulus (E/1+nu/2 = 1e9/(1+0.3)/2)
+    # Coh       = 5e8         # Von Mises yield
     ϕ         = 0*π/180    # friction angel
     P0        = 1e7*0       # [Pa]
     ph        = 7e-8        # pressure heating coef [K/Pa]
-    d_i       = 2e-3        # grain size [m]
+    d_i       = 7e-4        # grain size [m]
     # dt        = 2e5*s2yr   # physical time step value in seconds
-    nt        = 1          # number of time steps
+    nt        = 10           # number of time steps
     # GSE - From Behn et al. 2021
     λ_disl    = 0.03        # fitting param
     λ_gbs     = 0.03        # fitting param
@@ -182,7 +184,7 @@ end
     rel       = 1e-3
     nout      = 1e3
     tol       = 1e-5
-    iterMax   = 1e5
+    iterMax   = 5e5
     # numerics gse
     dtau_d    = 10.0*s2yr   # when steady = false
     rel_d     = 1e-1        # when steady = true
@@ -207,7 +209,6 @@ end
     τxz       = zeros(nz+1)
     τxz_o     = zeros(nz+1)
     Tii       =  ones(nz+1)
-    Eii       = zeros(nz+1)
     Eii1      = zeros(nz+1)
     dVxdτ     = zeros(nz)
     dτVx      = zeros(nz)
@@ -216,12 +217,6 @@ end
     η_basal   = zeros(nz+1)
     η_gbs     = zeros(nz+1)
     η_disl    = zeros(nz+1)
-    Eii_diff  = zeros(nz+1)
-    Eii_basal = zeros(nz+1)
-    Eii_gbs   = zeros(nz+1)
-    Eii_disl  = zeros(nz+1)
-    Eii_el    = zeros(nz+1)
-    Eii_pl    = zeros(nz+1)
     r_d       = zeros(nz+1)
     dd        = zeros(nz+1)
     F         = zeros(nz+1)
@@ -232,6 +227,7 @@ end
     # initial conditions
     zc        = LinRange(-zbot+dz/2, ztop-dz/2, nz  )
     zv        = LinRange(-zbot     , ztop     , nz+1)
+    zve       = LinRange(-zbot-dz/2, ztop+dz/2, nz+2)
     gisp2     = load("gisp_data.jld")
     gisp2     = gisp2["gisp2_gs"]
     # p1 = plot(T, zv, legend=false, linewidth=:3.0, framestyle=:box, xlabel="T [K]", ylabel="depth [m]")
@@ -240,6 +236,9 @@ end
     # display(plot(p1, p2, p3, layout=(1,3), background_color=:transparent, foreground_color=:gray))
     # savefig("ice_column1D_GSE_Tii_gisp2_initial.png")
     # error("Display initial conditions")
+    Vxe      .= ϵ_bg.*zve
+    Coh       = ρ.*g.*zv.*sin(α)
+    Coh[1:270] .= 5.0.*Coh[1:270]
     ηv        =  η0.*ones(nz+1)
     η_p       =  η0.*ones(nz+1)
     η_el      =  G.*dt
@@ -247,43 +246,47 @@ end
     d         = d_i.*ones(nz+1)
     P         =  P0.*ones(nz+1)
     d_o      .= d
-    global m_gbs, n_gbs, n_disl
     # time loop
     for it = 1:nt
         d_o   .= d
         τxz_o .= τxz
-        iter = 1; err = 2*tol; errd = err
-        while (err>tol || errd>tol) && iter<iterMax
-            ϵxz     .= 0.5.*diff(Vxe)/dz .+ ϵ_bg
-            ϵxz1    .= ϵxz .+ τxz_o./(fact.*η_el)
-            Eii     .= sqrt.(ϵxz.^2)
+        iter = 1; err = 2*tol
+        while err>tol && iter<iterMax
+            ϵxz     .= 0.5.*diff(Vxe)/dz
+            ϵxz1    .= ϵxz .+ do_elast*τxz_o./(fact.*η_el)
             Eii1    .= sqrt.(ϵxz1.^2)
-            compute_rheol_Tau!(ηv, η_el, η_diff, η_basal, η_gbs, η_disl, d, Tii, T, P, ph, R, fact)
-            # ηv      .= η_p#ηv      .= rel.*η_p .+ (1.0-rel).*ηv # rel ve nonlin
-            # ηv      .= rel.*η_p .+ (1.0-rel).*ηv # rel ve nonlin
-            τxz     .= fact*ηv.*ϵxz1
+            compute_rheol_Tau!(ηv, η_el, η_diff, η_basal, η_gbs, η_disl, d, Tii, T, P, ph, R, fact, do_elast)
+            if do_plast
+                τxz     .= fact.*ηv.*ϵxz1
+                Tii     .= sqrt.(τxz.^2)
+                F       .= Tii .- Coh.*cos(ϕ) .- P.*sin(ϕ)
+                Pla     .= 0.0
+                Pla     .= F .> 0.0
+                λ       .= Pla.*F./ηv # here if rel plastic only
+                dQdτxz  .= τxz./Tii
+                τxz     .= fact.*ηv.*(ϵxz1 .- 0.5.*λ.*dQdτxz)
+                Tii     .= sqrt.(τxz.^2)
+                Fchk    .= Tii .- Coh.*cos(ϕ) .- P.*sin(ϕ)
+                η_p     .= Tii./(fact.*Eii1)
+            else
+                η_p     .= ηv
+            end
+            ηvp     .= rel.*η_p .+ (1.0-rel).*ηvp # rel vep nonlin
+            τxz     .= fact.*ηvp.*ϵxz1
             Tii     .= sqrt.(τxz.^2)
-            F       .= Tii .- Coh.*cos(ϕ) .- P.*sin(ϕ)
-            Pla     .= 0.0
-            Pla     .= F .> 0.0
-            λ       .= Pla.*F./ηv # rel plastic only
-            dQdτxz  .= τxz./Tii
-            τxz     .= fact.*ηv.*(ϵxz1 .- 0.5.*λ.*dQdτxz)
-            Tii     .= sqrt.(τxz.^2)
-            Fchk    .= Tii .- Coh.*cos(ϕ) .- P.*sin(ϕ)
-            # ηvp     .= Tii./(fact.*Eii1) # Eii effectif (Moresi 2003) # rel ve + p
-            ηvp     .= rel.*(Tii./(fact.*Eii1)) .+ (1.0-rel).*ηvp # rel ve nonlin
-            τxz     .= fact.*ηvp.*ϵxz1 # should be same as 272
             errd = compute_GSE_Tau!(dd, d, r_d, d_o, η_gbs, η_disl, Tii, τxz, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, gam, p, c, dt, R, fact, steady, rel_d, dtau_d)
             Fx      .= diff(τxz)/dz .- ρ.*g.*sin(α)
             dVxdτ   .= 0.5*dVxdτ .+ 0.5.*(Fx .+ dVxdτ*damp) # Crank-Nicolson here
             dτVx    .= dz.*dz./(0.5.*(ηvp[1:end-1].+ηvp[2:end]))./2.1
             Vxe[2:end-1] .= Vxe[2:end-1] .+ dτVx.*dVxdτ
             Vxe[1]   = -Vxe[2]
-            Vxe[end] =  Vxe[end-1]
+            Vxe[end] =  Vxe[end-1] .+ ϵ_bg*dz
+            # Vxe[end] =  Vxe[end-1] .+ 1e0./ηvp[end].*dz
             if mod(iter, nout)==0
-                err  = norm(Fx)/length(Fx)
-                @printf("it=%d, iter=%d, err=%2.2e, errd=%2.2e, F=%2.2e (Fch=%2.2e), gse=[%1.3f, %1.3f]\n", it, iter, err, errd, maximum(F), maximum(Fchk), minimum(d)*1e3, maximum(d)*1e3)
+                errF = norm(Fx)/length(Fx)
+                errη = norm(abs.(η_p.-ηvp)./η0)./length(ηvp)
+                err  = maximum([errF, errη, errd])
+                @printf("it=%d, iter=%d, errF=%2.2e, errη=%2.2e, errd=%2.2e, F=%2.2e (Fch=%2.2e), gse=[%1.3f, %1.3f]\n", it, iter, errF, errη, errd, maximum(F), maximum(Fchk), minimum(d)*1e3, maximum(d)*1e3)
             end
             iter += 1
         end
@@ -295,45 +298,63 @@ end
         ϵxz_diff    = τxz./(fact.*η_diff)
         ϵxz_bas_gbs = τxz./(fact.*(η_basal .+ η_gbs))
         ϵxz_disl    = τxz./(fact.*η_disl)
-        ϵxz_el      = τxz./(fact.*η_el)
-        ϵxz_pl      = 1e-30 .+ 0.5*λ.*dQdτxz # is this the plastic strain rate ? # τxz./(fact.*η_pl) # what is the plastic 
+        ϵxz_el      = (τxz .- τxz_o)./(fact.*η_el)
+        ϵxz_pl      = 0.5*λ.*dQdτxz
         τxz_basal   = fact.*η_basal.*ϵxz_bas_gbs
         τxz_gbs     = fact.*η_gbs.*ϵxz_bas_gbs
-        @show(minimum(ϵxz_pl))
-        @show(maximum(τxz .- (τxz_basal .+ τxz_gbs)))
-        @show(maximum(ϵxz .- (ϵxz_diff .+ ϵxz_bas_gbs .+ ϵxz_disl .+ ϵxz_el .+ ϵxz_pl)))
-        p1 = plot(F,zv,label="F", linewidth=:3.0);# plot!(F,zv,label="F"); 
-        # p1 = plot(τxz[1:10:end],zv[1:10:end],label="τxz", linewidth=:0.0, markershape=:circle, markersize=4); plot!(τxz_basal,zv,label="τxz_basal"); plot!(τxz_gbs,zv,label="τxz_gbs"); 
-        display(plot(p1)); #error("stop")
+        println("check τxz = $( round(maximum((τxz .- (τxz_basal .+ τxz_gbs))./mean(τxz)), sigdigits=2) )")
+        err_ϵ = abs.((ϵxz1 .- (ϵxz_diff .+ ϵxz_bas_gbs .+ ϵxz_disl .+ do_elast*ϵxz_el .+ ϵxz_pl))./mean(ϵxz1))
+        println("check ϵxz = $(round(maximum(err_ϵ), sigdigits=2))")
+        η_visc      = 1.0./(1.0./η_diff .+ 1.0./(η_basal .+ η_gbs) .+ 1.0./η_disl)
         Eii_diff    = sqrt.(ϵxz_diff.^2)
         Eii_bas_gbs = sqrt.(ϵxz_bas_gbs.^2)
         Eii_disl    = sqrt.(ϵxz_disl.^2)
         Eii_el      = sqrt.(ϵxz_el.^2)
         Eii_pl      = sqrt.(ϵxz_pl.^2)
+        # Mechanisms
+        Mech = zeros(nz+1)
+        Mech[(ϵxz_diff .> ϵxz_bas_gbs) .& (ϵxz_diff .> ϵxz_disl)    .& (ϵxz_diff .> ϵxz_el)    .& (ϵxz_diff .> ϵxz_pl)   ] .= 1
+        Mech[(ϵxz_bas_gbs .> ϵxz_diff) .& (ϵxz_bas_gbs .> ϵxz_disl) .& (ϵxz_bas_gbs .> ϵxz_el) .& (ϵxz_bas_gbs .> ϵxz_pl)] .= 2
+        Mech[(ϵxz_disl .> ϵxz_bas_gbs) .& (ϵxz_disl .> ϵxz_diff)    .& (ϵxz_disl .> ϵxz_el)    .& (ϵxz_disl .> ϵxz_pl)   ] .= 4
+        Mech[(ϵxz_pl .> ϵxz_diff)      .& (ϵxz_pl .> ϵxz_disl)      .& (ϵxz_pl .> ϵxz_el)      .& (ϵxz_pl .> ϵxz_bas_gbs)] .= 5
+        Mech[(Mech.==2) .& (τxz_gbs .> τxz_basal)] .= 3
         # visualisation
         # p1 = plot(Vxe[2:end-1]*s2yr, zc, linewidth=:3.0, framestyle=:box, xlabel="Vx [m/yr]", ylabel="depth [m]", label="This study", legend=:topleft, foreground_color_legend = nothing)
         #     #  plot!(Vx_Behn[1:10:end]*s2yr, zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
+        p1 = plot(s2yr*Vxe[2:end][Mech.==1], zv[Mech.==1], linewidth=:3.0, label="diffusion creep", framestyle=:box, xlabel="Vx [m/yr]", ylabel="depth [m]", legend=:topleft, foreground_color_legend = nothing, legendfontsize=10)
+            plot!(s2yr*Vxe[2:end][Mech.==2], zv[Mech.==2], linewidth=:3.0, label="basal sliding")
+            plot!(s2yr*Vxe[2:end][Mech.==3], zv[Mech.==3], linewidth=:3.0, label="grain boundary sliding")
+            plot!(s2yr*Vxe[2:end][Mech.==4], zv[Mech.==4], linewidth=:3.0, label="dislocation creep")
+            plot!(s2yr*Vxe[2:end][Mech.==5], zv[Mech.==5], linewidth=:3.0, label="brittle failure")
         # p2 = plot(log10.(ϵxz), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(ϵxz) [1/s]", label="This study", legend=:bottomleft, foreground_color_legend = nothing)
         #     #  plot!(log10.(Eii_Behn)[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
-        # p3 = plot(1e-6*τxz, zv, linewidth=:3.0, framestyle=:box, xlabel="τxz [MPa]", label="This study")
-        #     #  plot!(1e-6*Txz_Behn[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
-        # p4 = plot(log10.(ηv), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(η) [Pa.s]", ylabel="depth [m]", label="This study", legend=:bottomright, foreground_color_legend = nothing)
+        p2 = plot(log10.(ϵxz)[Mech.==1], zv[Mech.==1], linewidth=:3.0, framestyle=:box, xlabel="log10(ϵxz) [1/s]", legend=false)
+            plot!(log10.(ϵxz)[Mech.==2], zv[Mech.==2], linewidth=:3.0)
+            plot!(log10.(ϵxz)[Mech.==3], zv[Mech.==3], linewidth=:3.0)
+            plot!(log10.(ϵxz)[Mech.==4], zv[Mech.==4], linewidth=:3.0)
+            plot!(log10.(ϵxz)[Mech.==5], zv[Mech.==5], linewidth=:3.0)
+        # p3 = plot(Mech, zv, linewidth=:3.0, framestyle=:box, xlabel="τxz [MPa]", ylabel="depth [m]", label="This study", legend=:bottomleft, foreground_color_legend = nothing)
+        # p3 = plot!(1e-6*Txz_Behn[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
+        # p4 = plot(log10.(η_visc), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(η) [Pa.s]", ylabel="depth [m]", label="This study", legend=:bottomright, foreground_color_legend = nothing)
         #     #  plot!(log10.(η_Behn)[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
-        # p5 = plot(1e3*d, zv, linewidth=:3.0, framestyle=:box, xlabel="d [mm]", label="This study", legend=:topright, foreground_color_legend = nothing)
-        #      plot!(data_Behn[:,2], .-data_Behn[:,1], linewidth=:3.0, label="Behn et al. 2021")
-        #      plot!(gisp2[:,2], .-gisp2[:,1], linewidth=:0.0, markershape=:circle, markersize=3, framestyle=:box,label="Gow et al. 1997")
-        #     #  plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
-        # display(plot(p1, p2, p4, p5, background_color=:transparent, foreground_color=:gray))
-        
-        # p1 = plot(log10.(ϵxz_diff), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(ϵxz) [1/s]", ylabel="depth [m]", label="ϵxz_diff", legend=:bottomleft, foreground_color_legend = nothing)
-        #     plot!(log10.(ϵxz_bas_gbs), zv, linewidth=:3.0, thickness_scaling = 1, label="ϵxz_bas_gbs")
-        #     plot!(log10.(ϵxz_disl), zv, linewidth=:3.0, thickness_scaling = 1, label="ϵxz_disl")
-        #     plot!(log10.(ϵxz_el), zv, linewidth=:3.0, label="ϵxz_el")
-        #     plot!(log10.(ϵxz_pl), zv, linewidth=:3.0, label="ϵxz_pl")
-        # display(plot(p1, background_color=:transparent, foreground_color=:gray))
-        # savefig("ice_column1D_GSE_Tii_gisp2_exz.png")
+        p4 = plot(log10.(η_visc)[Mech.==1], zv[Mech.==1], linewidth=:3.0, framestyle=:box, xlabel="log10(η) [Pa.s]", ylabel="depth [m]", legend=false)
+            plot!(log10.(η_visc)[Mech.==2], zv[Mech.==2], linewidth=:3.0)
+            plot!(log10.(η_visc)[Mech.==3], zv[Mech.==3], linewidth=:3.0)
+            plot!(log10.(η_visc)[Mech.==4], zv[Mech.==4], linewidth=:3.0)
+            plot!(log10.(η_visc)[Mech.==5], zv[Mech.==5], linewidth=:3.0)
+        p5 = plot(1e3*d, zv, linewidth=:3.0, framestyle=:box, xlabel="d [mm]", label="This study", legend=:topright, foreground_color_legend = nothing, legendfontsize=10)
+            plot!(data_Behn[:,2], .-data_Behn[:,1], linewidth=:3.0, label="Behn et al. 2021")
+            plot!(gisp2[:,2], .-gisp2[:,1], linewidth=:0.0, markershape=:circle, markersize=3, framestyle=:box,label="Gow et al. 1997")
+            #  plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
+        # p6 = plot(log10.(Eii1), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(ϵII) [1/s]", xlims=(-26, -9.5), label="ϵII", legend=:bottomleft, foreground_color_legend = nothing)
+        p6 = plot(log10.(Eii_diff), zv, linewidth=:3.0, label="ϵII_diff", xlims=(-26, -9.5), legend=:bottomleft, foreground_color_legend = nothing)
+            plot!(log10.(Eii_bas_gbs), zv, linewidth=:3.0, label="ϵII_bas_gbs")
+            plot!(log10.(Eii_disl), zv, linewidth=:3.0, label="ϵII_disl")
+            if do_elast plot!(log10.(Eii_el), zv, linewidth=:3.0, label="ϵII_el") end
+            if do_plast plot!(log10.(Eii_pl), zv, linewidth=:3.0, label="ϵII_pl") end
+        display(plot(p1, p2, p4, p5, layout=(2,2), size=(700,800), background_color=:transparent, foreground_color=:gray))
     end
-    # savefig("ice_column1D_GSE_Tii_gisp2_all.png")
+    savefig("ice_column1D_GSE_Tii_gisp2_v.png")
     return
 end
 
