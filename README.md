@@ -7,6 +7,7 @@ We implement the wattmeter ([Austin and Evans, 2007](https://doi.org/10.1130/G23
 
 # Content
 * [Benchmark](#benchmark)
+* [Complex rheology](#complex-rheology)
 * [References](#references)
 
 # Benchmark
@@ -47,6 +48,21 @@ We implemented the parameters and configuration from the 1D ice core data case (
 The initial temperature, age and grain size distribution profiles are taken from [Clow et al. (1999)](https://doi.org/10.1594/PANGAEA.55517), [Ram et al. (2000)](https://doi.org/10.1029/2000JD900321) and [Gow et al. 1997](https://doi.org/10.1029/97JC00165), respectively:
 
 ![](docs/ice_column1D_GSE_Tii_gisp2_initial.png)
+
+# Complex rheology
+We extend the [`ice_column1D_GSE_Tii_GISP2.jl`](gisp2/ice_column1D_GSE_Tii_GISP2.jl) code to include, besides grain boundary sliding (gbs) and dislocation creep mechanisms also diffusion and dislocation creep, elasticity and brittle failure. The [`ice_column1D_GSE_Tii_GISP2_allvep.jl`](gisp2/ice_column1D_GSE_Tii_GISP2_allvep.jl) is thus a more complete version allowing to test which are the active mechanisms in a given configuration. We here apply it to the [GISP2](gisp2) data for the
+
+i) viscous case:
+
+![](docs/ice_column1D_GSE_Tii_gisp2_v.png)
+
+ii) visco-elastic case:
+
+![](docs/ice_column1D_GSE_Tii_gisp2_ve.png)
+
+iii) visco-elasto-plastic case:
+
+![](docs/ice_column1D_GSE_Tii_gisp2_vep.png)
 
 ## 🚧 Work in progress
 
