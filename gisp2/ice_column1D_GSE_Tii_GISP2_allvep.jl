@@ -147,7 +147,7 @@ end
 
 @views function ice_column1D()
     steady    = false
-    do_elast  = false
+    do_elast  = true
     do_plast  = false
     # physics
     fact      = 2.0
@@ -333,8 +333,8 @@ end
             plot!(log10.(ϵxz)[Mech.==3], zv[Mech.==3], linewidth=:3.0)
             plot!(log10.(ϵxz)[Mech.==4], zv[Mech.==4], linewidth=:3.0)
             plot!(log10.(ϵxz)[Mech.==5], zv[Mech.==5], linewidth=:3.0)
-        # p3 = plot(Mech, zv, linewidth=:3.0, framestyle=:box, xlabel="τxz [MPa]", ylabel="depth [m]", label="This study", legend=:bottomleft, foreground_color_legend = nothing)
-        # p3 = plot!(1e-6*Txz_Behn[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
+        # p3 = plot(1e-6*τxz, zv, linewidth=:3.0, framestyle=:box, xlabel="τxz [MPa]", ylabel="depth [m]", label="This study", legend=:bottomleft, foreground_color_legend = nothing)
+        #     plot!(1e-6*Txz_Behn[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
         # p4 = plot(log10.(η_visc), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(η) [Pa.s]", ylabel="depth [m]", label="This study", legend=:bottomright, foreground_color_legend = nothing)
         #     #  plot!(log10.(η_Behn)[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
         p4 = plot(log10.(η_visc)[Mech.==1], zv[Mech.==1], linewidth=:3.0, framestyle=:box, xlabel="log10(η) [Pa.s]", ylabel="depth [m]", legend=false)
@@ -354,7 +354,7 @@ end
             if do_plast plot!(log10.(Eii_pl), zv, linewidth=:3.0, label="ϵII_pl") end
         display(plot(p1, p2, p4, p5, layout=(2,2), size=(700,800), background_color=:transparent, foreground_color=:gray))
     end
-    savefig("ice_column1D_GSE_Tii_gisp2_v.png")
+    # savefig("ice_column1D_GSE_Tii_gisp2_v.png")
     return
 end
 
