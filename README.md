@@ -42,8 +42,8 @@ We implemented the parameters and configuration from the 1D ice column case ([Se
 ### GSE application
 We implemented the parameters and configuration from the 1D ice core data case ([Section 3.4]((https://doi.org/10.5194/tc-2020-295))) to reproduce the Figure 7 using the [`ice_column1D_GSE_Tii_GISP2.jl`](gisp2/ice_column1D_GSE_Tii_GISP2.jl) code:
 
-<!-- ![](docs/ice_column1D_GSE_Tii_gisp2.png) -->
-![](docs/ice_column1D_GSE_Tii_gisp2_al4.png)
+![](docs/ice_column1D_GSE_Tii_gisp2.png)
+<!-- ![](docs/ice_column1D_GSE_Tii_gisp2_al4.png) -->
 
 The initial temperature, age and grain size distribution profiles are taken from [Clow et al. (1999)](https://doi.org/10.1594/PANGAEA.55517), [Ram et al. (2000)](https://doi.org/10.1029/2000JD900321) and [Gow et al. 1997](https://doi.org/10.1029/97JC00165), respectively:
 
