@@ -148,9 +148,9 @@ end
     mpow   = -(1.0-1.0/npow)/2.0
     P0     = 1e7*0       # [Pa]
     ph     = 7e-8        # pressure heating coef [K/Pa]
-    d_i    = 2e-3        # grain size [m]
+    d_i    = 1e-3        # grain size [m]
     # dt     = 2e5*s2yr   # physical time step value in seconds
-    nt     = 1          # number of time steps
+    nt     = 10          # number of time steps
     # GSE - From Behn et al. 2021
     λ_disl = 0.03        # fitting param
     λ_gbs  = 0.03        # fitting param
@@ -173,7 +173,7 @@ end
     T      =  zeros(nz+1)
     dt     =  zeros(nz+1)
     ztop, zbot = load_data!(T, "./data_gisp2.jld", dt, "./age_gisp2.jld", 0)
-    dt    .= dt*s2yr
+    dt    .= dt*s2yr/nt
     H      = zbot - ztop
     # AL4 Azuma with T fit
     # p      = 6.9
@@ -254,9 +254,9 @@ end
              plot!(data_Behn[:,2], .-data_Behn[:,1], linewidth=:3.0, label="Behn et al. 2021")
              plot!(gisp2[:,2], .-gisp2[:,1], linewidth=:0.0, markershape=:circle, markersize=3, framestyle=:box,label="Gow et al. 1997")
             #  plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
-        display(plot(p1, p2, p4, p5, background_color=:transparent, foreground_color=:gray))
+        display(plot(p1, p2, p4, p5, size=(700,500), dpi=150, background_color=:transparent, foreground_color=:gray))
     end
-    # savefig("ice_column1D_GSE_Tii_gisp2.png")
+    savefig("ice_column1D_GSE_Tii_gisp2.png")
     return
 end
 
