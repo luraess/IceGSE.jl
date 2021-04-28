@@ -204,18 +204,18 @@ end
         Txz_Behn, Eii_Behn, η_Behn, dB, Vx_Behn = check_Behn(T, zv, d_i, λ_disl, λ_gbs, Kgg, Qgg, R, gam, p, c, ρ, g, α, dz, fact)
         # visualisation
         p1 = plot(Vxe[2:end-1]*s2yr, zc, linewidth=:3.0, framestyle=:box, xlabel="Vx [m/yr]", ylabel="depth [m]", label="This study")
-             plot!(Vx_Behn[1:10:end]*s2yr, zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21", legend=:topleft)
+             plot!(Vx_Behn[1:10:end]*s2yr, zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn et al., 2021", legend=:topleft, foreground_color_legend = nothing)
         p2 = plot(log10.(ϵxz), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(ϵxz) [1/s]", label="This study")
-             plot!(log10.(Eii_Behn)[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
+             plot!(log10.(Eii_Behn)[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn et al., 2021", legend=:bottomleft, foreground_color_legend = nothing)
         p3 = plot(1e-6*τxz, zv, linewidth=:3.0, framestyle=:box, xlabel="τxz [MPa]", label="This study")
-             plot!(1e-6*Txz_Behn[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21")
+             plot!(1e-6*Txz_Behn[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn et al., 2021", foreground_color_legend = nothing)
         p4 = plot(log10.(ηv), zv, linewidth=:3.0, framestyle=:box, xlabel="log10(η) [Pa.s]", ylabel="depth [m]", label="This study")
-             plot!(log10.(η_Behn)[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21", legend=:bottomright)
+             plot!(log10.(η_Behn)[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn et al., 2021", legend=:bottomright, foreground_color_legend = nothing)
         p5 = plot(1e3*d, zv, linewidth=:3.0, framestyle=:box, xlabel="d [mm]", label="This study")
-             plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21", legend=:bottomright)
-        display(plot(p1, p2, p4, p5, background_color=:transparent, foreground_color=:gray))
+             plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn et al., 2021", legend=:bottomright, foreground_color_legend = nothing)
+        display(plot(p1, p2, p4, p5, size=(700,500), dpi=150, background_color=:transparent, foreground_color=:gray))
     end
-    # savefig("ice_column1D_GSE_Tii.png")
+    savefig("ice_column1D_GSE_Tii.png")
     return
 end
 
