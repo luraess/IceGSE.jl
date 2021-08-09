@@ -230,7 +230,7 @@ end
              plot!(1e3*dB[1:10:end], zv[1:10:end], linewidth=:0.0, markershape=:circle, markersize=4, label="Behn21", legend=:bottomright)
         display(plot(p1, p2, p4, p5, background_color=:transparent, foreground_color=:gray))
     end
-    savefig("ice_column1D_GSE_Tii_gisp2_Temp.png")
+    # savefig("ice_column1D_GSE_Tii_gisp2_Temp.png")
     return
 end
 
