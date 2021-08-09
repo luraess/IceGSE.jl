@@ -46,7 +46,7 @@ const s2yr = 3600*24*365.25
 end
 
 @views function load_data!(T2, dat_file, skip)
-     data  = load(dat_file)
+     data  = load(joinpath(@__DIR__, dat_file))
      Depth = data["depth"]
      Temp  = data["temp"]
      Depth = [0.0;    Depth[1:end-skip]]

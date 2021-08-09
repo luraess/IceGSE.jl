@@ -35,8 +35,8 @@ const s2yr = 3600*24*365.25
 end
 
 @views function load_data!(T, dat_file, A, dat_file2, skip)
-    data   = load(dat_file)
-    data2  = load(dat_file2)
+    data   = load(joinpath(@__DIR__, dat_file))
+    data2  = load(joinpath(@__DIR__, dat_file2))
     Depth  = data["depth"]
     Temp   = data["temp"]
     Depth2 = data2["depth"]
@@ -221,8 +221,7 @@ end
     # initial conditions
     zc        = LinRange(-zbot+dz/2, ztop-dz/2, nz  )
     zv        = LinRange(-zbot     , ztop     , nz+1)
-    gisp2     = load("gisp_data.jld")
-    gisp2     = gisp2["gisp2_gs"]
+    gisp2     = load(joinpath(@__DIR__, "gisp_data.jld"))["gisp2_gs"]
     # p1 = plot(T, zv, legend=false, linewidth=:3.0, framestyle=:box, xlabel="T [K]", ylabel="depth [m]")
     # p2 = plot(dt/s2yr/1e3, zv, legend=false, linewidth=:3.0, framestyle=:box, xlabel="Age [kyrs]")
     # p3 = plot(gisp2[:,2], .-gisp2[:,1], legend=false, linewidth=:0.0, markershape=:circle, markersize=5, framestyle=:box, xlabel="grain size [mm]")
@@ -266,8 +265,7 @@ end
         end
         # Behn et al.
         # Txz_Behn, Eii_Behn, η_Behn, dB, Vx_Behn = check_Behn(T, zv, d_i, λ_disl, λ_gbs, Kgg, Qgg, R, gam, p, c, ρ, g, α, dz, fact)
-        data_Behn  = load("behn_gisp_fit.jld")
-        data_Behn  = data_Behn["behn_gisp2_fit"]
+        data_Behn  = load(joinpath(@__DIR__, "behn_gisp_fit.jld"))["behn_gisp2_fit"]
         # Strain rates
         ϵxz_diff    = τxz./(fact.*η_diff)
         ϵxz_bas_gbs = τxz./(fact.*(η_basal .+ η_gbs))
