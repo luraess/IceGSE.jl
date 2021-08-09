@@ -1,0 +1,325 @@
+using Plots, Printf, LinearAlgebra, Statistics
+
+const s2yr = 3600*24*365.25
+
+@views av_xy(A) = 0.25*(A[1:end-1,1:end-1].+A[2:end,1:end-1].+A[1:end-1,2:end].+A[2:end,2:end])
+@views av_xi(A) =  0.5*(A[1:end-1,2:end-1].+A[2:end,2:end-1])
+@views av_yi(A) =  0.5*(A[2:end-1,1:end-1].+A[2:end-1,2:end])
+
+@views function compute_rheol_Tau!(Eta, Eta_diff, Eta_basal, Eta_gbs, Eta_disl, η_el, d, Tii, T, P, ph, R, fact, do_elast)
+    T_h        = T .+ ph.*P  # T_h: melting point adjusted temperature[K]
+    # Diffusional Rheology (Goldsby and Kohlstedt 2001, eq.4 + Table 6)
+    m_diff     = 2
+    n_diff     = 1
+    F_diff     = (2^((2*n_diff-1)/n_diff))^-1          # simple shear epxeriments (not sure 100%)
+    Dv         = 9.1e-4                                # Dv: exponential prefactor[m^2/s]
+    Vm         = 1.97e-5                               # Vm: molar volume
+    A_diff     = 42.0*Vm./(R.*T_h).*Dv
+    Q_diff     = 59.4e3                                # Q1: diffusional activation energy[J/mol]
+    # Basal Rheology (Goldsby and Kohlstedt 2001, eq.3 + Table 5)
+    n_basal    = 2.4;
+    F_basal    = (2^((n_basal-1)/n_basal)*3^((n_basal+1)/(2*n_basal)))^-1; # pure shear epxeriments
+    A_basal    = 5.5e7*10^(-6*n_basal)                 # MPa to Pa conversion
+    Q_basal    = 60e3
+    # GBS Rheology (Goldsby and Kohlstedt 2001, eq.3 + Table 5)
+    m_gbs      = 1.4
+    n_gbs      = 1.8
+    F_gbs      = (2.0^((n_gbs-1.0)/n_gbs)*3.0^((n_gbs+1.0)/(2.0*n_gbs)))^-1.0
+    A1_gbs     = 3.9e-3*10.0^(-6.0*n_gbs)              # A_gbs: preexponential constant[m^1.4/s*Pa^1.8] in Pa^(-n_gbs).s^(-1).m^(m_gbs)
+    Q1_gbs     = 49e3                                  # Q1_gbs: lower activation energy[J/mol]
+    Q2_gbs     = 192e3                                 # Q2_gbs: higher activation energy[J/mol]
+    Tstar_gbs  = 259.0                                 # Tstar_gbs: activation threshold[K] (-18C)
+    # Dislocation Rheology (Goldsby and Kohlstedt 2001, eq.3 + Table 5)
+    n_disl     = 4.0
+    F_disl     = (2.0^((n_disl-1.0)/n_disl)*3.0^((n_disl+1.0)/(2.0*n_disl)))^-1.0 # pure shear epxeriments
+    A1_disl    = 4e4*10.0^(-6.0*n_disl)                # A_disl: preexponential constant[1/s*Pa^4]  in  Pa^(-n_disl).s^(-1)
+    Q1_disl    = 60e3                                  # Q1_disl: lower activation energy[J/mol]
+    Q2_disl    = 180e3                                 # Q2_disl: higher activation energy[J/mol]
+    Tstar_disl = 259.0                                 # Tstar_gbs: activation threshold[K] (-15C)
+    # Temperature dependence of activation energy ONLY for GBS and DISL (melting point)
+    Tstar_gbs_h  = Tstar_gbs  .+ ph.*P                 # Tstar_h:  adjusted activation threshold[K]
+    Tstar_disl_h = Tstar_disl .+ ph.*P                 # Tstar_h:  adjusted activation threshold[K]
+    Q_gbs_h    = zeros(size(T))                        # Q_gbs_h:  melting point adjusted activation energy[J/mol]
+    Q_disl_h   = zeros(size(T))                        # Q_disl_h: melting point adjusted activation energy[J/mol]
+    Q_gbs_h[ (T_h.-Tstar_gbs_h ).<=0.0] .= Q1_gbs
+    Q_gbs_h[ (T_h.-Tstar_gbs_h ).> 0.0] .= Q2_gbs
+    Q_disl_h[(T_h.-Tstar_disl_h).<=0.0] .= Q1_disl
+    Q_disl_h[(T_h.-Tstar_disl_h).> 0.0] .= Q2_disl
+    As_gbs     =  A1_gbs .*exp.(-Q1_gbs ./(R.*Tstar_gbs_h ))
+    As_disl    =  A1_disl.*exp.(-Q1_disl./(R.*Tstar_disl_h))
+    # Pre-computations
+    B_diff     = F_diff .* A_diff .^(-1.0) .* exp.( Q_diff  ./(R.*T_h))
+    B_basal    = F_basal.* A_basal.^(-1.0) .* exp.( Q_basal ./(R.*T_h))
+    B_gbs      = F_gbs  .* As_gbs .^(-1.0) .* exp.((Q_gbs_h ./R).*((1.0./T_h).-(1.0./Tstar_gbs_h ))) # B_gbs      = A1_gbs .^(-1.0/n_gbs)   .* exp.((Q1_gbs ./(n_gbs  .*R .* T_h )))
+    B_disl     = F_disl .* As_disl.^(-1.0) .* exp.((Q_disl_h./R).*((1.0./T_h).-(1.0./Tstar_disl_h))) # B_disl     = A1_disl.^(-1.0/n_disl)  .* exp.((Q1_disl./(n_disl .*R .* T_h )))
+    # Isolated viscosities
+    Eta_diff  .= fact^(n_diff-1) .* B_diff .* Tii.^(1.0-n_diff ).*d.^m_diff
+    Eta_basal .= fact^(n_basal-1).* B_basal.* Tii.^(1.0-n_basal)
+    Eta_gbs   .= fact^(n_gbs-1)  .* B_gbs  .* Tii.^(1.0-n_gbs  ).*d.^m_gbs
+    Eta_disl  .= fact^(n_disl-1) .* B_disl .* Tii.^(1.0-n_disl )
+    # viscosity guess
+    Eta       .= 1.0./(1.0./Eta_diff .+ 1.0./(Eta_basal .+ Eta_gbs) .+ 1.0./Eta_disl .+ do_elast./η_el)
+    return
+end
+
+@views function compute_GSE_Tau!(dd, d, r_d, d_o, Eta_gbs, Eta_disl, Tii, Txx, Tzz, Txzn, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, gam, p, c, dt, R, fact, steady, rel_d, dtau_d)
+    T_h       = T .+ ph.*P  # T_h: melting point adjusted temperature[K]
+    Eii_gbs   = Tii./(fact*Eta_gbs)
+    Eii_disl  = Tii./(fact*Eta_disl)
+    if steady==true
+        Eii   = Eii_gbs .+ Eii_disl
+        β     = Eii_disl ./ Eii; β[end,:] .= 0.0
+        d_p   = ((Kgg.*exp.(.-Qgg./(R.*T_h)).*(1.0/p).*c.*gam) ./ ((λ_gbs .- β*λ_gbs .+ β.*λ_disl).*Tii.*Eii)).^(1.0./(1.0+p))
+        d    .= rel_d*d_p .+ (1-rel_d)*d
+        ddn   = d_p .- d
+        errd  = mean(abs.(ddn[:,2:end-1]))
+    else
+        # work
+        Wxx_disl = Txx  .* Eii_disl .* Txx  ./ Tii # Exx = Eii* Txx/Tii that's what we do
+        Wzz_disl = Tzz  .* Eii_disl .* Tzz  ./ Tii
+        Wxz_disl = Txzn .* Eii_disl .* Txzn ./ Tii
+        Wxx_gbs  = Txx  .* Eii_gbs  .* Txx  ./ Tii
+        Wzz_gbs  = Tzz  .* Eii_gbs  .* Tzz  ./ Tii
+        Wxz_gbs  = Txzn .* Eii_gbs  .* Txzn ./ Tii
+        Q_disl   = sqrt.(0.5.*(Wxx_disl.^2 .+ Wzz_disl.^2) .+ Wxz_disl.^2)
+        Q_gbs    = sqrt.(0.5.*(Wxx_gbs.^2  .+ Wzz_gbs.^2)  .+ Wxz_gbs.^2)
+        # Reduction rate
+        dred     = .-d.^2 ./c./gam .* (λ_disl.*Q_disl .+ λ_gbs.*Q_gbs)   # d grain reduction eqn. (12)
+        # Growth rate
+        dgg      =  p.^(-1).*d.^(1-p).*Kgg.*exp.(.-Qgg./R./T_h)           # d grain growth eq. (4)
+        # Grain size evolution residual
+        # d       .= d .+ dt.*(dgg .+ dred)
+        # rel_d    = 0.0001
+        # d_p      = d_o .+ dt.*(dgg .+ dred)
+        # d       .= rel_d*d_p .+ (1-rel_d)*d
+        r_d2     = d_o./dt .+ (dgg .+ dred)
+        dd      .= 0.5*dd .+ 0.5*r_d2   # Crank-Nicolson here on "numerics"
+        d       .= (d .+ dtau_d.*dd)./(1.0 .+ dtau_d./dt)
+        r_d     .= .-(d.-d_o)./dt .+ (dgg .+ dred)
+        errd  = mean(abs.(r_d.*dt))
+    end
+    return errd
+end
+
+@views function fastice2D()
+    do_visu  = true
+    PERIOD   = 0
+    do_glen  = false
+    do_elast = false
+    # Physics
+    T_K    =  273.0
+    R      =  8.314
+    g      =  9.8
+    ρ      =  900.0
+    κ      =  2.51
+    cp     =  2096.9
+    Q0     =  6*1e4
+    a0     =  8.75*1e-13
+    η0     =  1e15 #1.5e7; # cut-off viscosity
+    G      =  3.5e7       # Elastic modulus (E/1+nu/2 = 1e9/(1+0.3)/2)
+    # GSE
+    P0     =  1e7*0       # [Pa]
+    ph     =  7e-8        # pressure heating coef [K/Pa]
+    d_i    =  7e-4        # grain size [m]
+    # Input values
+    Lz     =  500.0
+    α      =  5.0
+    T0     = -20.0
+    T_base = -2.0
+    npow   =  3
+    MELT   =  1  # Melting if MELT = 1.0, none if =0
+    Tm     = -0.2 # defined metling temperature °C
+    # scales
+    T0     = T0 + T_K
+    T_base = T_base + T_K
+    # T_sc   = npow*R*T0^2/Q0
+    # τ_sc   = ρ*cp*T_sc
+    # t_sc   = 2^(-npow)*a0^(-1)*τ_sc^(-npow)*exp(Q0/R/T0)
+    # L_sc   = sqrt(κ/ρ/cp)*sqrt(t_sc)
+    # non-dimensional values
+    # Lz     = Lz/L_sc
+    # F      = ρ*g*sind(α)*L_sc/τ_sc
+    F      = ρ*g*sind(α)
+    # theta  = T0/T_sc;
+    # q      = q0/κ*L_sc/T_sc
+    # q      = q0/κ
+    t_t    = 2.2160e9
+    dt     = 3.6933e6
+    aspect = 10.0
+    # Numerics
+    nx     = 125 #255
+    nz     = 32 #63
+    epsi   = 1e-5
+    CN     = 0.5
+    damp   = 2.0
+    relV   = 1.0
+    relP   = 0.5
+    η_b    = 0.5
+    rele   = 1e-2
+    niter  = 1e5
+    nout   = 2000
+    # Pre-processing
+    Lx     = aspect*Lz
+    mpow   = -(1-1/npow)/2
+    # q      = (T_base-T0)/Lz/T_sc
+    q      = (T_base-T0)/Lz*κ
+    dx, dz = Lx/(nx-1), Lz/(nz-1)
+    xn, zn = LinRange(-dx/2, Lx+dx/2, nx-1), LinRange(-dz/2, Lz+dz/2, nz-1)
+    xc, zc = LinRange(0, Lx, nx), LinRange(0, Lz, nz)
+    # Initial conditions
+    η_el   = G.*dt
+    T      = repeat(LinRange((T_base-T0), (T0-T0), nz)', nx, 1) # T      = repeat(LinRange((T_base-T0)/T_sc, (T0-T0)/T_sc, nz)', nx, 1)
+    T_o    = copy(T)
+    Etan   = 1e10*ones(nx,nz)
+    TII2   =      ones(nx,nz)
+    d      = d_i.*ones(nx,nz)
+    Etas   = zeros(nx-1,nz-1)
+    P      = zeros(nx  ,nz  )
+    ∇V     = zeros(nx  ,nz  )
+    Exx    = zeros(nx  ,nz  )
+    Ezz    = zeros(nx  ,nz  )
+    Exz    = zeros(nx-1,nz-1)
+    Exzn   = zeros(nx  ,nz  )
+    Txx    = zeros(nx  ,nz  )
+    Tzz    = zeros(nx  ,nz  )
+    Txz    = zeros(nx-1,nz-1)
+    Txzn   = zeros(nx  ,nz  )
+    EII2   = zeros(nx  ,nz  )
+    dVxdt  = zeros(nx-1,nz-2)
+    dVzdt  = zeros(nx-2,nz-1)
+    ResVx  = zeros(nx-1,nz-2)
+    ResVz  = zeros(nx-2,nz-1)
+    dtVx   = zeros(nx-1,nz-2)
+    dtVz   = zeros(nx-2,nz-1)
+    Vx     = zeros(nx+1,nz  )
+    Vz     = zeros(nx  ,nz+1)
+    dtP    = zeros(nx  ,nz  )
+    dTdt   = zeros(nx  ,nz  )
+    dTdt_o = zeros(nx  ,nz  )
+    Hs     = zeros(nx  ,nz  )
+    qxT    = zeros(nx+1,nz  )
+    qzT    = zeros(nx  ,nz+1)
+    T_res  = zeros(nx  ,nz  )
+    T2     = zeros(nx  ,nz  )
+    H      = zeros(nx  ,nz  )
+    Eta_p     = zeros(nx  ,nz  )
+    Eta_it    = zeros(nx  ,nz  )
+    Eta_diff  = zeros(nx  ,nz  )
+    Eta_basal = zeros(nx  ,nz  )
+    Eta_gbs   = zeros(nx  ,nz  )
+    Eta_disl  = zeros(nx  ,nz  )
+    nt     = cld(t_t, dt)
+    time   = 0.0
+    iterrorR = 2*epsi
+    err0 = 2*epsi
+    # Time loop
+    for it = 1:nt
+        T_o    .= T
+        dTdt_o .= dTdt
+        iterror = 2*epsi
+        iter    = 1
+        while iterror>epsi && iter<niter # Pseudo-Transient cycles
+            # Timesteps
+            dtP     .= relP.*4.1 ./ max(nx,nz) .* Etan .* (1.0 .+ η_b)
+            dtVx    .= relV.*min(dx,dz)^2 ./ av_xi(Etan) ./ (1.0 + η_b) ./ 4.1
+            dtVz    .= relV.*min(dx,dz)^2 ./ av_yi(Etan) ./ (1.0 + η_b) ./ 4.1
+            dtT      = 1.0 ./ (1.0 ./ (min(dx,dz)^2 ./κ.*ρ.*cp./4.1) .+ 1.0 ./ dt)
+            # Pressure update and strain rates
+            ∇V      .= diff(Vx, dims=1)./dx .+ diff(Vz, dims=2)./dz
+            P       .= P .- ∇V.*dtP
+            Exx     .= diff(Vx, dims=1)./dx .- 1.0/3.0 .* ∇V
+            Ezz     .= diff(Vz, dims=2)./dz .- 1.0/3.0 .* ∇V
+            Exz     .= 0.5.*(diff(Vx[2:end-1,:], dims=2)./dz .+ diff(Vz[:,2:end-1], dims=1)./dx)
+            Exzn[2:end-1,2:end-1] .= av_xy(Exz)
+            if PERIOD==1 Exzn[[1, end], :] = Exzn[[2, end-1], :] end # /!\ uncomment if open box on sides
+            Exzn[:,1] .= Exzn[:,2]
+            EII2    .= 0.5.*(Exx.^2 .+ Ezz.^2) .+ Exzn.^2 .+ 1e-18
+            # Rheology
+            if do_glen
+                # Eta_p   .= 0.5.*a0.^(-1.0 ./ npow) .* EII2.^mpow .* exp.(Q0./(npow.*R.*(T0 .+ T))) # nondim: eta_phys = EII2.^mpow.*exp( -T./(1+T/theta) )
+                Eta_p   .= 0.5.*a0.^(-1.0) .* TII2.^((1.0-npow)/2.0) .* exp.(Q0./(R.*(T0 .+ T)))
+                Eta_it  .= 1.0./(1.0./Eta_p .+ 1.0./η0)
+            else
+                compute_rheol_Tau!(Eta_p, Eta_diff, Eta_basal, Eta_gbs, Eta_disl, η_el, d, sqrt.(TII2), T.+T0, P, ph, R, 2.0, do_elast)
+                Eta_it  .= 1.0./(1.0./Eta_p .+ 1.0./η0)
+            end
+            Etan    .= (rele.*Eta_it .+ (1 .- rele).*Etan)
+            Etan[:,[1,end]] .= Etan[:,[2,end-1]]
+            Etan[[1,end],:] .= Etan[[2,end-1],:]
+            Etas    .= av_xy(Etan)
+            # Stresses
+            Txx     .= 2.0 .* Etan .* (Exx .+ η_b.*∇V)
+            Tzz     .= 2.0 .* Etan .* (Ezz .+ η_b.*∇V)
+            Txz     .= 2.0 .* Etas .* Exz
+            Txzn    .= 2.0 .* Etan .* Exzn
+            TII2    .= 0.5.*(Txx.^2 .+ Tzz.^2) .+ Txzn.^2
+            if sum(isnan.(TII2))!=0 error("NaN") end
+            # errd = compute_GSE_Tau!(dd, d, r_d, d_o, Eta_gbs, ETa_disl, sqrt.(TII2), Txx, Tzz, Txzn, T.+T0, P, ph, λ_disl, λ_gbs, Qgg, Kgg, gam, p, c, dt, R, 2.0, steady, rel_d, dtau_d)
+            # Residuals
+            ResVx   .= diff(Txz, dims=2)./dz .- diff(P[:,2:end-1], dims=1)./dx .+ diff(Txx[:,2:end-1], dims=1)./dx .+ F
+            ResVz   .= diff(Txz, dims=1)./dx .- diff(P[2:end-1,:], dims=2)./dz .+ diff(Tzz[2:end-1,:], dims=2)./dz .- F.*cotd(α)
+            dVxdt   .= dVxdt.*(1-damp/nx) .+ ResVx
+            dVzdt   .= dVzdt.*(1-damp/nz) .+ ResVz
+            qxT[2:end-1,:] .= .-κ .* diff(T, dims=1)./dx
+            qzT[:,2:end-1] .= .-κ .* diff(T, dims=2)./dz
+            Hs      .= 4.0 .* Etan .* EII2
+            # Melting
+            T2      .= T .+ (T0 .- T_K)
+            H       .= 1.0 .- tanh.( .-(T2 .- Tm)./0.5 )
+            dTdt    .= 1.0./ρ./cp .* (.-(diff(qxT, dims=1)./dx .+ diff(qzT, dims=2)./dz) .+ Hs) .* (1.0 .- H.*MELT)
+            T_res   .= .-(T .- T_o)./dt .+ (1.0 .- CN).*dTdt .+ CN.*dTdt_o # Crank Nicolson
+            # Vel update
+            Vx[2:end-1,2:end-1] .= Vx[2:end-1,2:end-1] .+ dVxdt.*dtVx
+            Vz[2:end-1,2:end-1] .= Vz[2:end-1,2:end-1] .+ dVzdt.*dtVz
+            T       .= T .+ dtT.*T_res
+            # Boundary conditions
+            # BC left
+            Vx[1,2:end-1]   .= .-Vx[2,2:end-1] .* PERIOD*(-1) # /!\ change sign if open box on sides
+            Vz[1,2:end-1]   .=   Vz[2,2:end-1]
+            # BC right
+            Vx[end,2:end-1] .= .-Vx[end-1,2:end-1] .* PERIOD*(-1) # /!\ change sign if open box on sides
+            Vz[end,2:end-1] .=   Vz[end-1,2:end-1]
+            # BC bottom
+            Vx[:,1]  .= 0.0
+            Vz[:,1]  .= .-Vz[:,2]
+            qzT[:,1] .= q
+            # BC top
+            Vz[:,end]       .= Vz[:,end-1] .+ dz.*P[:,end] ./ Etan[:,end]./2.0 .+ dz.*(1.0/3.0 .- η_b).*∇V[:,end]
+            Vx[2:end-1,end] .=   Vx[2:end-1,end-1] .- dz./dx.*(Vz[2:end,end-1] .- Vz[1:end-1,end-1]) .+ dz./3.0 .* Txz[:,end-1] ./ Etas[:,end]
+            Vx[[1,end],end] .= .-Vx[[2,end-1],end] .* PERIOD*(-1) # /!\ change sign if open box on sides
+            T[:,end]        .= 0.0
+            # errors
+            if iter==1 || iter % nout == 0
+                norm_X  = norm(ResVx)/length(ResVx)
+                norm_Z  = norm(ResVz)/length(ResVz)
+                norm_P  = norm(∇V)/length(∇V)
+                # norm_T  = norm(T_res)/length(T_res)
+                if (iter==1)  err0 = max(norm_X, norm_Z, norm_P) end
+                if (iter>100) iterror = max(norm_X, norm_Z, norm_P) end
+                iterrorR = iterror/err0
+                @printf("it=%d, iter=%d, err=%1.3e, err/err0=%1.3e \n", it, iter, iterror, iterrorR)
+                if do_visu
+                    fontsize = 6
+                    opts = (yaxis=font(fontsize, "Courier"), xaxis=font(fontsize, "Courier"),
+                        ticks=nothing, framestyle=:box, titlefontsize=fontsize, titlefont="Courier", colorbar_title="", c=:davos)
+                    p1 = heatmap(xn, zc, Vx[2:end-1,:]' .* s2yr; title="Vx", ylabel="Ly", opts...)
+                    p2 = heatmap(xc, zc, T' .+ (T0-T_K); title="T", ylabel="Ly", opts...)
+                    p3 = heatmap(xc, zc, log10.(Etan)'; title="log10(η)", xlabel="Lx", ylabel="Ly", opts...)
+                    p4 = heatmap(xc, zn, qzT[:,2:end-1]'; title="qzT", opts...)
+                    p5 = heatmap(xc, zc, Hs'; title="Hs", opts...)
+                    p6 = heatmap(xc, zc, H'; title="H", xlabel="Lx", opts...)
+                    display(plot(p1, p4, p2, p5, p3, p6, layout=(3,2)))
+                    # p1 = heatmap(xc, zc, TII2'; title="Vx", ylabel="Ly", opts...)
+                    # display(plot(p1, layout=(1,1)))
+                end
+            end
+            iter+=1
+        end
+        # if mod(it,20)==1,eval(['save run_TM2D_' int2str(it)]); end
+        @printf("it=%d, iter=%d, err=%1.3e \n",it, iter, iterror)
+        time = time + dt
+    end
+    return
+end
+
+fastice2D()
