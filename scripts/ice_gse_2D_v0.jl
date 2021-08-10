@@ -63,8 +63,8 @@ const s2yr = 3600*24*365.25
     q      = (T_base-T0)/Lz*κ
     dx     = Lx/(nx-1)
     dz     = Lz/(nz-1)
-    xn     = LinRange(-dx/2, Lx+dx/2, nx-1)
-    zn     = LinRange(-dz/2, Lz+dz/2, nz-1)
+    xn     = LinRange(-dx/2, Lx+dx/2, nx+1)
+    zn     = LinRange(-dz/2, Lz+dz/2, nz+1)
     xc     = LinRange(0, Lx, nx)
     zc     = LinRange(0, Lz, nz)
     # T      = repeat(LinRange((T_base-T0)/T_sc, (T0-T0)/T_sc, nz)', nx, 1)
@@ -185,10 +185,10 @@ const s2yr = 3600*24*365.25
                     fontsize = 6
                     opts = (yaxis=font(fontsize, "Courier"), xaxis=font(fontsize, "Courier"),
                         ticks=nothing, framestyle=:box, titlefontsize=fontsize, titlefont="Courier", colorbar_title="", c=:davos)
-                    p1 = heatmap(xn, zc, Vx[2:end-1,:]' .* s2yr; title="Vx", ylabel="Ly", opts...)
+                    p1 = heatmap(xn, zc, Vx' .* s2yr; title="Vx", ylabel="Ly", opts...)
                     p2 = heatmap(xc, zc, T' .+ (T0-T_K); title="T", ylabel="Ly", opts...)
                     p3 = heatmap(xc, zc, log10.(Etan)'; title="log10(η)", xlabel="Lx", ylabel="Ly", opts...)
-                    p4 = heatmap(xc, zn, qzT[:,2:end-1]'; title="qzT", opts...)
+                    p4 = heatmap(xc, zn, qzT'; title="qzT", opts...)
                     p5 = heatmap(xc, zc, Hs'; title="Hs", opts...)
                     p6 = heatmap(xc, zc, H'; title="H", xlabel="Lx", opts...)
                     display(plot(p1, p4, p2, p5, p3, p6, layout=(3,2)))

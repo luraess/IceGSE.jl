@@ -194,7 +194,7 @@ end
     # q        = (T_base-T0)/Lz/T_sc
     q        = (T_base-T0)/Lz*κ
     dx, dz   = Lx/(nx-1), Lz/(nz-1)
-    xn, zn   = LinRange(-dx/2, Lx+dx/2, nx-1), LinRange(-dz/2, Lz+dz/2, nz-1)
+    xn, zn   = LinRange(-dx/2, Lx+dx/2, nx+1), LinRange(-dz/2, Lz+dz/2, nz+1)
     xc, zc   = LinRange(0, Lx, nx), LinRange(0, Lz, nz)
     # Initial conditions
     nt       = cld(t_t, dt)
@@ -352,10 +352,10 @@ end
                     fontsize = 6
                     opts = (yaxis=font(fontsize, "Courier"), xaxis=font(fontsize, "Courier"),
                         ticks=nothing, framestyle=:box, titlefontsize=fontsize, titlefont="Courier", colorbar_title="", c=:davos)
-                    p1 = heatmap(xn, zc, Vx[2:end-1,:]' .* s2yr; title="Vx", ylabel="Ly", opts...)
+                    p1 = heatmap(xn, zc, Vx' .* s2yr; title="Vx", ylabel="Ly", opts...)
                     p2 = heatmap(xc, zc, T' .+ (T0-T_K); title="T", ylabel="Ly", opts...)
                     p3 = heatmap(xc, zc, log10.(Etan)'; title="log10(η)", xlabel="Lx", ylabel="Ly", opts...)
-                    p4 = heatmap(xc, zn, qzT[:,2:end-1]'; title="qzT", opts...)
+                    p4 = heatmap(xc, zn, qzT'; title="qzT", opts...)
                     p5 = heatmap(xc, zc, Hs'; title="Hs", opts...)
                     p6 = heatmap(xc, zc, 1e3*d'; title="grain size [mm]", xlabel="Lx", opts...)
                     # p6 = heatmap(xc, zc, H'; title="H", xlabel="Lx", opts...)
