@@ -6,6 +6,20 @@ const s2yr = 3600*24*365.25
 @views av_xi(A) =  0.5*(A[1:end-1,2:end-1].+A[2:end,2:end-1])
 @views av_yi(A) =  0.5*(A[2:end-1,1:end-1].+A[2:end-1,2:end])
 
+@views function compute_EII(Txx, Tzz, Txzn, Eta)
+    Exx  = Txx ./(2.0.*Eta)
+    Ezz  = Tzz ./(2.0.*Eta)
+    Exzn = Txzn./(2.0.*Eta)
+    return EII = sqrt.(0.5.*(Exx.^2 .+ Ezz.^2) .+ Exzn.^2)
+end
+
+@views function compute_TII(Exx, Ezz, Exzn, Eta)
+    Txx  = 2.0.*Eta.*Exx
+    Tzz  = 2.0.*Eta.*Ezz
+    Txzn = 2.0.*Eta.*Exzn
+    return TII = sqrt.(0.5.*(Txx.^2 .+ Tzz.^2) .+ Txzn.^2)
+end
+
 @views function compute_rheol_Tau!(Eta, Eta_diff, Eta_basal, Eta_gbs, Eta_disl, η_el, d, Tii, T, P, ph, R, do_elast)
     fact       = 2.0
     T_h        = T .+ ph.*P  # T_h: melting point adjusted temperature[K]
@@ -68,7 +82,6 @@ end
     T_h       = T .+ ph.*P  # T_h: melting point adjusted temperature[K]
     Eii_gbs   = Tii./(fact*Eta_gbs)
     Eii_disl  = Tii./(fact*Eta_disl)
-    # display(heatmap(Eta_gbs')); #error("stop")
     if steady==true
         Eii   = Eii_gbs .+ Eii_disl
         β     = Eii_disl ./ Eii; #β[:,end] .= 0.0
@@ -101,12 +114,13 @@ end
         r_d     .= .-(d.-d_o)./dt .+ (dgg .+ dred)
         errd  = mean(abs.(r_d.*dt))
     end
+    d[:,end] = d[:,end-1]
     return errd
 end
 
 @views function fastice2D()
     do_visu  = true
-    PERIOD   = 1
+    PERIOD   = 0
     MELT     = 1  # Melting if MELT = 1.0, none if =0
     do_glen  = false
     do_elast = true
@@ -156,24 +170,24 @@ end
     # theta    = T0/T_sc;
     # q        = q0/κ*L_sc/T_sc
     # q        = q0/κ
-    t_t      = 70.2*s2yr
-    dt       = 0.117*s2yr #3.6933e6
-    aspect   = 10.0
+    t_t      =  70.2*s2yr
+    dt       =  0.117*s2yr #3.6933e6
+    aspect   =  10.0
     # Numerics
-    nx       = 125 #255
-    nz       = 32 #63
-    epsi     = 1e-5
-    CN       = 0.5
-    damp     = 2.0
-    relV     = 1.0
-    relP     = 0.5
-    η_b      = 0.5
-    rele     = 2e-2
-    niter    = 1e5
-    nout     = 1000
+    nx       =  125 #255
+    nz       =  32 #63
+    epsi     =  1e-5
+    CN       =  0.5
+    damp     =  2.0
+    relV     =  1.0
+    relP     =  0.5
+    η_b      =  0.5
+    rele     =  2e-2
+    niter    =  1e5
+    nout     =  1000
     # Numerics gse
-    dtau_d   = 0.01*s2yr   # when steady = false
-    rel_d    = 1e-2        # when steady = true
+    dtau_d   =  0.01*s2yr   # when steady = false
+    rel_d    =  1e-2        # when steady = true
     # Pre-processing
     Lx       = aspect*Lz
     mpow     = -(1-1/npow)/2
@@ -345,9 +359,7 @@ end
                     p5 = heatmap(xc, zc, Hs'; title="Hs", opts...)
                     p6 = heatmap(xc, zc, 1e3*d'; title="grain size [mm]", xlabel="Lx", opts...)
                     # p6 = heatmap(xc, zc, H'; title="H", xlabel="Lx", opts...)
-                    display(plot(p1, p4, p2, p5, p3, p6, layout=(3,2)))
-                    # p1 = heatmap(xc, zc, TII2'; title="Vx", ylabel="Ly", opts...)
-                    # display(plot(p1, layout=(1,1)))
+                    # display(plot(p1, p4, p2, p5, p3, p6, layout=(3,2)))
                     p1 = heatmap(Eta_p')
                     p2 = heatmap(Eta_diff')
                     p3 = heatmap(Eta_basal')
@@ -356,6 +368,25 @@ end
                     p6 = heatmap(TII2')
                     # display(plot(p1, p4, p2, p5, p3, p6, layout=(3,2)))
                 end
+                # Strain rates
+                EII_diff    = compute_EII(Txx, Tzz, Txzn, Eta_diff)
+                EII_bas_gbs = compute_EII(Txx, Tzz, Txzn, Eta_basal .+ Eta_gbs)
+                EII_disl    = compute_EII(Txx, Tzz, Txzn, Eta_disl)
+                EII_el      = compute_EII(Txx, Tzz, Txzn, η_el)
+                TII_basal   = compute_TII(Exx, Ezz, Exzn, Eta_basal)
+                TII_gbs     = compute_TII(Exx, Ezz, Exzn, Eta_gbs)
+                # err_τ = (sqrt.(TII2) .- (TII_basal .+ TII_gbs))./mean(sqrt.(TII2))
+                # err_ϵ = abs.((sqrt.(EII2) .- (EII_diff .+ EII_bas_gbs .+ EII_disl .+ do_elast*EII_el))./mean(sqrt.(EII2)))
+                # println("check Tii = $(round(maximum(err_τ), sigdigits=2))")
+                # println("check ϵxz = $(round(maximum(err_ϵ), sigdigits=2))")
+                # Mechanisms
+                Mech = zeros(nx,nz)
+                Mech[(EII_diff .> EII_bas_gbs) .& (EII_diff .> EII_disl)    .& (EII_diff .> EII_el)    ] .= 1 #.& (EII_diff .> ϵxz_pl)
+                Mech[(EII_bas_gbs .> EII_diff) .& (EII_bas_gbs .> EII_disl) .& (EII_bas_gbs .> EII_el) ] .= 2 #.& (EII_bas_gbs .> ϵxz_pl)
+                Mech[(EII_disl .> EII_bas_gbs) .& (EII_disl .> EII_diff)    .& (EII_disl .> EII_el)    ] .= 4 #.& (EII_disl .> ϵxz_pl)
+                # Mech[(ϵxz_pl .> EII_diff)      .& (ϵxz_pl .> EII_disl)      .& (ϵxz_pl .> EII_el)      .& (ϵxz_pl .> EII_bas_gbs)] .= 5
+                Mech[(Mech.==2) .& (TII_gbs .> TII_basal)] .= 3
+                display(heatmap(Mech'))
             end
             iter+=1
         end
