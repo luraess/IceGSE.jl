@@ -122,7 +122,7 @@ end
     return
 end
 
-@views function compute_GSE_Tau!(dd, d, r_d, d_o, Eta_gbs, Eta_disl, Tii, Txx, Tzz, Txzn, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, γ, p, c, dt, R, steady, rel_d, dtau_d)
+@views function compute_GSE_Tau!(dd, d, r_d, d_o, Bedc, Eta_gbs, Eta_disl, Tii, Txx, Tzz, Txzn, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, γ, p, c, d_i, dt, R, steady, rel_d, dtau_d)
     fact      = 2.0
     T_h       = T .+ ph.*P  # T_h: melting point adjusted temperature[K]
     Eii_gbs   = Tii./(fact*Eta_gbs)
@@ -157,7 +157,9 @@ end
         dd      .= 0.5*dd .+ 0.5*r_d2   # Crank-Nicolson here on "numerics"
         d       .= (d .+ dtau_d.*dd)./(1.0 .+ dtau_d./dt)
         r_d     .= .-(d.-d_o)./dt .+ (dgg .+ dred)
+        r_d[Bedc.==1] .= 0.0; r_d[:,end] .= 0.0
         errd  = mean(abs.(r_d.*dt))
+        d[Bedc.==1] .= d_i; d[:,end] .= d_i
     end
     return errd
 end
@@ -165,13 +167,13 @@ end
 @views function fastice2D()
     do_visu  = true
     do_save  = false
-    run_id   = "v2_gauss"
+    run_id   = "v3"
     BUG1     = 0.0
     OPEN     = 1
     MELT     = 1  # Melting if MELT = 1.0, none if =0
     do_elast = true
-    do_glen  = true
-    do_gse   = false
+    do_glen  = false
+    do_gse   = true
     steady   = false
     do_bump  = true
     do_rand  = false
@@ -193,10 +195,10 @@ end
     Q0       =  6*1e4
     a0       =  8.75*1e-13
     η0       =  1e15 #1.5e7; # cut-off viscosity
-    G        =  2*3.5e7       # Elastic modulus (E/1+nu/2 = 1e9/(1+0.3)/2)
+    G        =  10*3.5e7       # Elastic modulus (E/1+nu/2 = 1e9/(1+0.3)/2)
     # GSE
     ph       =  7e-8        # pressure heating coef [K/Pa]
-    d_i      =  1e-3#7e-4        # grain size [m]
+    d_i      =  7e-4        # grain size [m]
     # GSE - From Behn et al. 2021
     λ_disl   =  0.03        # fitting param
     λ_gbs    =  0.03        # fitting param
@@ -236,7 +238,7 @@ end
     nout     =  1000
     nsave    =  10
     # Numerics gse
-    dtau_d   =  0.001*s2yr   # when steady = false
+    dtau_d   =  0.01*s2yr   # when steady = false
     rel_d    =  1e-2        # when steady = true
     # Pre-processing
     Lx       = aspect*Lz
@@ -381,8 +383,9 @@ end
             # if sum(isnan.(TII2))!=0 error("NaN") end
             # if do_gse && (it>1 || iter>4000)
             if do_glen==false && do_gse && it>1
-                TII2[Bedc.==1] .= 1.0; TII2[:,end] .= 1.0
-                errd = compute_GSE_Tau!(dd, d, r_d, d_o, Eta_gbs, Eta_disl, sqrt.(TII2), Txx, Tzz, Txzn, T.+T0, P, ph, λ_disl, λ_gbs, Qgg, Kgg, γ, p, c, dt, R, steady, rel_d, dtau_d)
+                TII2[Bedc.==1] .= 1.0; TII2[:,end] .= TII2[:,end-1]
+                errd = compute_GSE_Tau!(dd, d, r_d, d_o, Bedc, Eta_gbs, Eta_disl, sqrt.(TII2), Txx, Tzz, Txzn, T.+T0, P, ph, λ_disl, λ_gbs, Qgg, Kgg, γ, p, c, d_i, dt, R, steady, rel_d, dtau_d)
+                # d[Bedc.==1] .= d_i
             end
             # Residuals
             ResVx   .= diff(Txz, dims=2)./dz .- diff(P[:,2:end-1], dims=1)./dx .+ diff(Txx[:,2:end-1], dims=1)./dx .+ F .+ dPdx
@@ -445,7 +448,7 @@ end
                     p2 = heatmap(xc, zc, T' .+ (T0-T_K); title="T", ylabel="Ly", opts...)
                     p3 = heatmap(xc, zc, log10.(Etan)'; title="log10(η)", xlabel="Lx", ylabel="Ly", opts...)
                     # p4 = heatmap(xc, zn, qzT'; title="qzT", opts...)
-                    p5 = heatmap(xc, zc, Hs'; title="Hs", opts...)
+                    p5 = heatmap(xc, zc, sqrt.(TII2)'; title="Tii", opts...)
                     p6 = heatmap(xc, zc, 1e3*d'; title="grain size [mm]", xlabel="Lx", opts...)
                     # p6 = heatmap(xc, zc, H'; title="H", xlabel="Lx", opts...)
                     # display(plot(p1, p4, p2, p5, p3, p6, layout=(3,2)))
