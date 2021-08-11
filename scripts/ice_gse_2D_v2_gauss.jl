@@ -1,4 +1,4 @@
-using Plots, Printf, LinearAlgebra, Statistics, Random
+using Plots, Printf, LinearAlgebra, Statistics, Random, MAT
 
 const s2yr = 3600*24*365.25
 
@@ -159,22 +159,25 @@ end
         r_d     .= .-(d.-d_o)./dt .+ (dgg .+ dred)
         errd  = mean(abs.(r_d.*dt))
     end
-    d[:,end] = d[:,end-1]
     return errd
 end
 
 @views function fastice2D()
     do_visu  = true
+    do_save  = false
+    run_id   = "v2_gauss"
     BUG1     = 0.0
     OPEN     = 1
     MELT     = 1  # Melting if MELT = 1.0, none if =0
     do_elast = true
-    do_glen  = false
-    do_gse   = true
+    do_glen  = true
+    do_gse   = false
     steady   = false
+    do_bump  = true
+    do_rand  = false
     # Physics
     Lz       =  680.0
-    α        =  2.0
+    α        =  1.0
     T0       = -11.0
     T_base   = -11.0
     npow     =  3
@@ -190,11 +193,10 @@ end
     Q0       =  6*1e4
     a0       =  8.75*1e-13
     η0       =  1e15 #1.5e7; # cut-off viscosity
-    G        =  3.5e7       # Elastic modulus (E/1+nu/2 = 1e9/(1+0.3)/2)
+    G        =  2*3.5e7       # Elastic modulus (E/1+nu/2 = 1e9/(1+0.3)/2)
     # GSE
-    P0       =  1e7*0       # [Pa]
     ph       =  7e-8        # pressure heating coef [K/Pa]
-    d_i      =  7e-4        # grain size [m]
+    d_i      =  1e-3#7e-4        # grain size [m]
     # GSE - From Behn et al. 2021
     λ_disl   =  0.03        # fitting param
     λ_gbs    =  0.03        # fitting param
@@ -218,11 +220,11 @@ end
     # q        = q0/κ*L_sc/T_sc
     # q        = q0/κ
     t_t      =  70.2*s2yr
-    dt       =  0.117*s2yr #3.6933e6
+    dt       =  2*0.117*s2yr #3.6933e6
     aspect   =  3.0
     # Numerics
-    nx       =  125#255
-    nz       =  63#125
+    nx       =  63#255
+    nz       =  31#125
     epsi     =  1e-4
     CN       =  0.5
     damp     =  2.0
@@ -232,6 +234,7 @@ end
     rele     =  2e-2
     niter    =  1e5
     nout     =  1000
+    nsave    =  10
     # Numerics gse
     dtau_d   =  0.001*s2yr   # when steady = false
     rel_d    =  1e-2        # when steady = true
@@ -246,26 +249,26 @@ end
     # Initial conditions
     nt       = cld(t_t, dt)
     η_el     = G.*dt
-
     amp      = Lz/7.0
     wid      = Lz/5.0
-    # Bedc     = initBedTopo(Lx, amp, nx  , nz  , dz, 200)
-    # Bedv     = initBedTopo(Lx, amp, nx+1, nz+1, dz, 200)
-    # Bedvx    = initBedTopo(Lx, amp, nx+1, nz  , dz, 200)
-    # Bedvz    = initBedTopo(Lx, amp, nx  , nz+1, dz, 200)
-
-    (Xc ,Zc ) = ([x for x=xc,z=zc], [z for x=xc,z=zc])
-    (Xvx,Zvx) = ([x for x=xn,z=zc], [z for x=xn,z=zc])
-    (Xvz,Zvz) = ([x for x=xc,z=zn], [z for x=xc,z=zn])
-    gaus     =          amp*exp.(.-((xc.-3*Lx./4)./wid).^2)
-    gaus    .=  gaus .+ amp*exp.(.-((xc.-  Lx./4)./wid).^2)
-    gausn    =          amp*exp.(.-((xn.-3*Lx./4)./wid).^2)
-    gausn   .= gausn .+ amp*exp.(.-((xn.-  Lx./4)./wid).^2)
-    Bedc     = repeat(gaus , 1, nz  )
-    Bedv     = repeat(gausn, 1, nz+1)
-    Bedvx    = repeat(gausn, 1, nz  )
-    Bedvz    = repeat(gaus , 1, nz+1)
-    
+    if do_bump
+        (Xc ,Zc ) = ([x for x=xc,z=zc], [z for x=xc,z=zc])
+        (Xvx,Zvx) = ([x for x=xn,z=zc], [z for x=xn,z=zc])
+        (Xvz,Zvz) = ([x for x=xc,z=zn], [z for x=xc,z=zn])
+        gaus     =          amp*exp.(.-((xc.-3*Lx./4)./wid).^2)
+        gaus    .=  gaus .+ amp*exp.(.-((xc.-  Lx./4)./wid).^2)
+        gausn    =          amp*exp.(.-((xn.-3*Lx./4)./wid).^2)
+        gausn   .= gausn .+ amp*exp.(.-((xn.-  Lx./4)./wid).^2)
+        Bedc     = repeat(gaus , 1, nz  ); Bedc[Bedc.<Zc] .= 0; Bedc[Bedc.!=0] .= 1
+        # Bedv     = repeat(gausn, 1, nz+1)
+        Bedvx    = repeat(gausn, 1, nz  ); Bedvx[Bedvx.<Zvx] .= 0; Bedvx[Bedvx.!=0] .= 1
+        Bedvz    = repeat(gaus , 1, nz+1); Bedvz[Bedvz.<Zvz] .= 0; Bedvz[Bedvz.!=0] .= 1
+    elseif do_rand
+        Bedc     = initBedTopo(Lx, amp, nx  , nz  , dz, 200)
+        Bedv     = initBedTopo(Lx, amp, nx+1, nz+1, dz, 200)
+        Bedvx    = initBedTopo(Lx, amp, nx+1, nz  , dz, 200)
+        Bedvz    = initBedTopo(Lx, amp, nx  , nz+1, dz, 200)
+    end
     T        = repeat(LinRange((T_base-T0), (T0-T0), nz)', nx, 1) # T      = repeat(LinRange((T_base-T0)/T_sc, (T0-T0)/T_sc, nz)', nx, 1)
     T_o      = copy(T)
     Etan     = 1e10*ones(nx,nz)
@@ -318,9 +321,15 @@ end
     Eta_basal= zeros(nx  ,nz  )
     Eta_gbs  = zeros(nx  ,nz  )
     Eta_disl = zeros(nx  ,nz  )
-    Tmpx     = zeros(nx-1,nz-2)
-    Tmpz     = zeros(nx-2,nz-1)
+    EII_diff = zeros(nx  ,nz  )
+    EII_bas_gbs = zeros(nx, nz)
+    EII_disl = zeros(nx  ,nz  )
+    EII_el   = zeros(nx  ,nz  )
+    TII_basal= zeros(nx  ,nz  )
+    TII_gbs  = zeros(nx  ,nz  )
+    Mech     = zeros(nx  ,nz  )
     time = 0.0; iterrorR = 2*epsi; err0 = 2*epsi; errd = 2*epsi
+    if do_save !ispath(joinpath(@__DIR__, "../output_$(run_id)_$(nx)_$(nz)")) && mkdir(joinpath(@__DIR__, "../output_$(run_id)_$(nx)_$(nz)")); isave=0 end
     # Time loop
     for it = 1:nt
         Txx_o  .= Txx
@@ -350,16 +359,14 @@ end
             Exzn[2:end-1,2:end-1] .= av_xy(Exz)
             if OPEN==1 Exzn[[1, end], :] = Exzn[[2, end-1], :] end # /!\ uncomment if open box on sides
             Exzn[:,1] .= Exzn[:,2]
-            EII2    .= 0.5.*(Exx.^2 .+ Ezz.^2) .+ Exzn.^2 .+ 1e-18
+            EII2    .= 0.5.*(Exx.^2 .+ Ezz.^2) .+ Exzn.^2
             # Rheology
             if do_glen
                 # Eta_p   .= 0.5.*a0.^(-1.0 ./ npow) .* EII2.^mpow .* exp.(Q0./(npow.*R.*(T0 .+ T))) # nondim: eta_phys = EII2.^mpow.*exp( -T./(1+T/theta) )
                 Eta_p   .= 0.5.*a0.^(-1.0) .* TII2.^((1.0-npow)/2.0) .* exp.(Q0./(R.*(T0 .+ T)))
-                # Eta_it  .= 1.0./(1.0./Eta_p .+ 1.0./η0)
                 Eta_it  .= 1.0./(1.0./Eta_p .+ do_elast./η_el)
             else
                 compute_rheol_Tau!(Eta_it, Eta_diff, Eta_basal, Eta_gbs, Eta_disl, η_el, d, sqrt.(TII2), T.+T0, P, ph, R, do_elast)
-                # Eta_it  .= 1.0./(1.0./Eta_p .+ 1.0./η0)
             end
             Etan    .= (rele.*Eta_it .+ (1 .- rele).*Etan)
             Etan[:,[1,end]] .= Etan[:,[2,end-1]]
@@ -370,10 +377,11 @@ end
             Tzz     .= 2.0 .* Etan .* (Ezz .+ η_b.*∇V)
             Txz     .= 2.0 .* Etas .* Exz
             Txzn    .= 2.0 .* Etan .* Exzn
-            TII2    .= 0.5.*(Txx.^2 .+ Tzz.^2) .+ Txzn.^2 .+ 1.0
+            TII2    .= 0.5.*(Txx.^2 .+ Tzz.^2) .+ Txzn.^2
             # if sum(isnan.(TII2))!=0 error("NaN") end
             # if do_gse && (it>1 || iter>4000)
             if do_glen==false && do_gse && it>1
+                TII2[Bedc.==1] .= 1.0; TII2[:,end] .= 1.0
                 errd = compute_GSE_Tau!(dd, d, r_d, d_o, Eta_gbs, Eta_disl, sqrt.(TII2), Txx, Tzz, Txzn, T.+T0, P, ph, λ_disl, λ_gbs, Qgg, Kgg, γ, p, c, dt, R, steady, rel_d, dtau_d)
             end
             # Residuals
@@ -410,20 +418,14 @@ end
             Vx[[1,end],end] .= .-Vx[[2,end-1],end] .* OPEN*(-1) # /!\ change sign if open box on sides
             T[:,end]        .= 0.0
             # Variable bed
-            # Tmpx .= Bedvx[2:end-1,2:end-1]
-            # ResVx[Tmpx.==1] .= 0.0
-            # Vx[Bedvx.==1]   .= 0.0
-            ResVx[Zvx[2:end-1,2:end-1].<Bedvx[2:end-1,2:end-1]] .= 0.0
-            Vx[Zvx.<Bedvx] .= 0.0
-            # Tmpz .= Bedvz[2:end-1,2:end-1]
-            # ResVz[Tmpz.==1] .= 0.0
-            # Vz[Bedvz.==1]   .= 0.0
-            ResVz[Zvz[2:end-1,2:end-1].<Bedvz[2:end-1,2:end-1]] .= 0.0
-            Vz[Zvz.<Bedvz] .= 0.0
-            # qxT[Bedvx.==1]  .= 0.0
-            # qzT[Bedvz.==1]  .= 0.0
-            qxT[Xvx.<Bedvx]  .= 0.0
-            qzT[Zvz.<Bedvz]  .= 0.0
+            if do_bump || do_rand
+                ResVx[Bedvx[2:end-1,2:end-1].==1] .= 0.0
+                ResVz[Bedvz[2:end-1,2:end-1].==1] .= 0.0
+                Vx[Bedvx.==1]  .= 0.0
+                Vz[Bedvz.==1]  .= 0.0
+                qxT[Bedvx.==1] .= 0.0
+                qzT[Bedvz.==1] .= 0.0
+            end
             # errors
             if iter==1 || iter % nout == 0
                 norm_X  = norm(ResVx)/length(ResVx)
@@ -442,7 +444,7 @@ end
                     p1 = heatmap(xn, zc, Vx' .* s2yr; title="Vx", ylabel="Ly", opts...)
                     p2 = heatmap(xc, zc, T' .+ (T0-T_K); title="T", ylabel="Ly", opts...)
                     p3 = heatmap(xc, zc, log10.(Etan)'; title="log10(η)", xlabel="Lx", ylabel="Ly", opts...)
-                    p4 = heatmap(xc, zn, qzT'; title="qzT", opts...)
+                    # p4 = heatmap(xc, zn, qzT'; title="qzT", opts...)
                     p5 = heatmap(xc, zc, Hs'; title="Hs", opts...)
                     p6 = heatmap(xc, zc, 1e3*d'; title="grain size [mm]", xlabel="Lx", opts...)
                     # p6 = heatmap(xc, zc, H'; title="H", xlabel="Lx", opts...)
@@ -455,18 +457,18 @@ end
                     # p6 = heatmap(TII2')
                     # display(plot(p1, p4, p2, p5, p3, p6, layout=(3,2)))
                     # Strain rates
-                    EII_diff    = compute_EII(Txx, Tzz, Txzn, Eta_diff)
-                    EII_bas_gbs = compute_EII(Txx, Tzz, Txzn, Eta_basal .+ Eta_gbs)
-                    EII_disl    = compute_EII(Txx, Tzz, Txzn, Eta_disl)
-                    EII_el      = compute_EII(Txx, Tzz, Txzn, η_el)
-                    TII_basal   = compute_TII(Exx, Ezz, Exzn, Eta_basal)
-                    TII_gbs     = compute_TII(Exx, Ezz, Exzn, Eta_gbs)
+                    EII_diff    .= compute_EII(Txx, Tzz, Txzn, Eta_diff)
+                    EII_bas_gbs .= compute_EII(Txx, Tzz, Txzn, Eta_basal .+ Eta_gbs)
+                    EII_disl    .= compute_EII(Txx, Tzz, Txzn, Eta_disl)
+                    EII_el      .= compute_EII(Txx, Tzz, Txzn, η_el)
+                    TII_basal   .= compute_TII(Exx, Ezz, Exzn, Eta_basal)
+                    TII_gbs     .= compute_TII(Exx, Ezz, Exzn, Eta_gbs)
                     # err_τ = (sqrt.(TII2) .- (TII_basal .+ TII_gbs))./mean(sqrt.(TII2))
                     # err_ϵ = abs.((sqrt.(EII2) .- (EII_diff .+ EII_bas_gbs .+ EII_disl .+ do_elast*EII_el))./mean(sqrt.(EII2)))
                     # println("check Tii = $(round(maximum(err_τ), sigdigits=2))")
                     # println("check ϵxz = $(round(maximum(err_ϵ), sigdigits=2))")
                     # Mechanisms
-                    Mech = zeros(nx, nz)
+                    Mech .= 0
                     Mech[(EII_diff .> EII_bas_gbs) .& (EII_diff .> EII_disl)    .& (EII_diff .> EII_el)    ] .= 1 #.& (EII_diff .> ϵxz_pl)
                     Mech[(EII_bas_gbs .> EII_diff) .& (EII_bas_gbs .> EII_disl) .& (EII_bas_gbs .> EII_el) ] .= 2 #.& (EII_bas_gbs .> ϵxz_pl)
                     Mech[(EII_disl .> EII_bas_gbs) .& (EII_disl .> EII_diff)    .& (EII_disl .> EII_el)    ] .= 4 #.& (EII_disl .> ϵxz_pl)
@@ -478,9 +480,17 @@ end
             end
             iter+=1
         end
-        # if mod(it,20)==1,eval(['save run_TM2D_' int2str(it)]); end
         @printf("it=%d, iter=%d, err=%1.3e \n",it, iter, iterror)
         time = time + dt
+        if do_save && (it == 1 || it % nsave == 0)
+            matwrite(joinpath(@__DIR__, "../output_$(run_id)_$(nx)_$(nz)/ice_gse_2D_$(isave).mat"),
+                      Dict("P"=> P, "Vx"=> Vx, "Vz"=> Vz, "T"=> T, "Hs"=> Hs, "H"=> H, "d"=> d,
+                           "Etan"=> Etan, "EII2"=> EII2, "TII2"=> TII2, "T"=> T,
+                           "Eta_diff"=> Eta_diff, "Eta_basal"=> Eta_basal, "Eta_gbs"=> Eta_gbs, "Eta_disl"=> Eta_disl,
+                           "EII_diff"=> EII_diff, "EII_bas_gbs"=> EII_bas_gbs, "EII_disl"=> EII_disl, "EII_el"=> EII_el, "TII_basal"=> TII_basal, "TII_gbs"=> TII_gbs, "Mech"=> Mech,
+                           "xc"=> Array(xc), "zc"=> Array(zc), "xn"=> Array(xn), "zn"=> Array(zn)); compress = true)
+            isave+=1
+        end
     end
     return
 end
