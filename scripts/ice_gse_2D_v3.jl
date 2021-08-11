@@ -434,7 +434,7 @@ end
                 norm_X  = norm(ResVx)/length(ResVx)
                 norm_Z  = norm(ResVz)/length(ResVz)
                 norm_P  = norm(∇V)/length(∇V)
-                errη    = norm(abs.(Eta_it.-Etan)./η0)./length(Etan)
+                errη    = norm(abs.(Eta_it[2:end-1,2:end-1].-Etan[2:end-1,2:end-1])./η0)./length(Etan[2:end-1,2:end-1])
                 # norm_T  = norm(T_res)/length(T_res)
                 if (iter==1)  err0 = max(norm_X, norm_Z, norm_P) end
                 if (iter>100) iterror = max(norm_X, norm_Z, norm_P) end
