@@ -61,62 +61,73 @@ LogRange(astart, astop, alength) = 10.0.^(range(astart, stop=astop, length=aleng
     return
 end
 
-# @views function compute_GSE_Tau!(dd, d, r_d, d_o, Eta_gbs, Eta_disl, Tii, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, γ, p, c, dt, R, steady, rel_d, dtau_d)
-#     fact      = 2.0
-#     T_h       = T .+ ph.*P  # T_h: melting point adjusted temperature[K]
-#     Eii_gbs   = Tii./(fact*Eta_gbs)
-#     Eii_disl  = Tii./(fact*Eta_disl)
-#     if steady==true
-#         Eii   = Eii_gbs .+ Eii_disl
-#         β     = Eii_disl ./ Eii; #β[:,end] .= 0.0
-#         d_p   = ((Kgg.*exp.(.-Qgg./(R.*T_h)).*(1.0/p).*c.*γ) ./ ((λ_gbs .- β*λ_gbs .+ β.*λ_disl).*Tii.*Eii)).^(1.0./(1.0+p))
-#         d    .= rel_d*d_p .+ (1-rel_d)*d
-#         ddn   = d_p .- d
-#         errd  = mean(abs.(ddn[:,2:end-1]))
-#     else
-#         # work
-#         W_disl = Tii .* Eii_disl # Exx = Eii* Txx/Tii that's what we do
-#         W_gbs  = Tii .* Eii_gbs
-#         Q_disl   = W_disl
-#         Q_gbs    = W_gbs
-#         # Reduction rate
-#         dred     = .-d.^2 ./c./γ .* (λ_disl.*Q_disl .+ λ_gbs.*Q_gbs)   # d grain reduction eqn. (12)
-#         # Growth rate
-#         dgg      =  p.^(-1).*d.^(1-p).*Kgg.*exp.(.-Qgg./R./T_h)        # d grain growth eq. (4)
-#         # Grain size evolution residual
-#         # d       .= d .+ dt.*(dgg .+ dred)
-#         # rel_d    = 0.0001
-#         # d_p      = d_o .+ dt.*(dgg .+ dred)
-#         # d       .= rel_d*d_p .+ (1-rel_d)*d
-#         r_d2     = d_o./dt .+ (dgg .+ dred)
-#         dd      .= 0.5*dd .+ 0.5*r_d2   # Crank-Nicolson here on "numerics"
-#         d       .= (d .+ dtau_d.*dd)./(1.0 .+ dtau_d./dt)
-#         r_d     .= .-(d.-d_o)./dt .+ (dgg .+ dred)
-#         errd  = mean(abs.(r_d.*dt))
-#     end
-#     return errd
-# end
+@views function compute_GSE_Tau!(dd, d, r_d, d_o, Eta_gbs, Eta_disl, Tii, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, γ, p, c, dt, R, steady, rel_d, dtau_d)
+    fact      = 2.0
+    T_h       = T .+ ph.*P  # T_h: melting point adjusted temperature[K]
+    Eii_gbs   = Tii./(fact*Eta_gbs)
+    Eii_disl  = Tii./(fact*Eta_disl)
+    if steady==true
+        Eii   = Eii_gbs .+ Eii_disl
+        β     = Eii_disl ./ Eii; #β[:,end] .= 0.0
+        d_p   = ((Kgg.*exp.(.-Qgg./(R.*T_h)).*(1.0/p).*c.*γ) ./ ((λ_gbs .- β*λ_gbs .+ β.*λ_disl).*Tii.*Eii)).^(1.0./(1.0+p))
+        d    .= rel_d*d_p .+ (1-rel_d)*d
+        ddn   = d_p .- d
+        errd  = mean(abs.(ddn[:,2:end-1]))
+    else
+        # work
+        W_disl = Tii .* Eii_disl # Exx = Eii* Txx/Tii that's what we do
+        W_gbs  = Tii .* Eii_gbs
+        Q_disl = W_disl
+        Q_gbs  = W_gbs
+        # Reduction rate
+        dred     = .-d.^2 ./c./γ .* (λ_disl.*Q_disl .+ λ_gbs.*Q_gbs)   # d grain reduction eqn. (12)
+        # Growth rate
+        dgg      =  p.^(-1).*d.^(1-p).*Kgg.*exp.(.-Qgg./R./T_h)        # d grain growth eq. (4)
+        # Grain size evolution residual
+        # d       .= d .+ dt.*(dgg .+ dred)
+        # rel_d    = 0.0001
+        # d_p      = d_o .+ dt.*(dgg .+ dred)
+        # d       .= rel_d*d_p .+ (1-rel_d)*d
+        r_d2     = d_o./dt .+ (dgg .+ dred)
+        dd      .= 0.5*dd .+ 0.5*r_d2   # Crank-Nicolson here on "numerics"
+        # dd      .= 0.0*dd .+ 1.0*r_d2   # Crank-Nicolson here on "numerics"
+        d       .= (d .+ dtau_d.*dd)./(1.0 .+ dtau_d./dt)
+        r_d     .= .-(d.-d_o)./dt .+ (dgg .+ dred)
+        errd  = mean(abs.(r_d.*dt))
+    end
+    return errd
+end
 
 @views function produce_map()
-    do_elast = true
+    do_elast = false
     do_save  = true
+    steady   = true
     # physics
-    R      = 8.314
-    p0     = 1e7
-    ph     = 7e-8
-    T      = 273
-    d      = 1e-3
-    dt     = 1000*0.117*s2yr
-    G      = 2*3.5e7
-    η_el   = G*dt
-    η0     = 1e15
+    R        = 8.314
+    p0       = 1e7
+    ph       = 7e-8
+    T        = 273
+    d_i      = 1e-3
+    G        = 2*3.5e7
+    η0       = 1e15
+    λ_disl   = 0.03        # fitting param
+    λ_gbs    = 0.03        # fitting param
+    Qgg      = 42e3        # grain growth activation energy
+    Kgg      = 1.02e-17    # grain growth prefactor !! units
+    γ        = 0.065       # param
+    p        = 6.03        # grain growth exponant
+    c        = 3.0         # geometric factor
+    dt       = 5*0.117*s2yr #3.6933e6
+    η_el     = G*dt
     # numerics
-    niter  = 500
-    rel    = 0.5
-    nout   = 50
-    nT, nE = 200, 210
-    Tvec   = LinRange(170, 273, nT)
-    EIIvec = LogRange(-16, -3, nE)
+    niter    = 10000
+    rel      = 0.2
+    dtau_d   = 0.00001*s2yr   # when steady = false
+    rel_d    = 1e-2        # when steady = true
+    nout     = 500
+    nT, nE   = 500, 501
+    Tvec     = LinRange(210, 273, nT)
+    EIIvec   = LogRange(-16, -6, nE)
     (T, EII) = ([x for x=Tvec, z=EIIvec], [z for x=Tvec, z=EIIvec])
     # initial
     Eta         = η0.*ones(nT, nE)
@@ -126,6 +137,10 @@ end
     Eta_disl    = η0.*ones(nT, nE)
     TII         =     ones(nT, nE)
     P           = p0.*ones(nT, nE)
+    d           = d_i.*ones(nT, nE)
+    d_o         = d_i.*ones(nT, nE)
+    dd          = zeros(nT, nE)
+    r_d         = zeros(nT, nE)
     EII_diff    = zeros(nT, nE)
     EII_bas_gbs = zeros(nT, nE)
     EII_disl    = zeros(nT, nE)
@@ -133,17 +148,29 @@ end
     TII_basal   = zeros(nT, nE)
     TII_gbs     = zeros(nT, nE)
     Mech        = zeros(nT, nE)
+    ΔTII        = zeros(nT, nE)
+    errd = 0.0
+    for it=1:1
 
-    for it=1:niter
+        d_o .= d
 
-        TII .= (1-rel) .* TII .+ rel .* (2.0 .* Eta .* EII)
+        for iter=1:niter
 
-        compute_rheol_Tau!(Eta, Eta_diff, Eta_basal, Eta_gbs, Eta_disl, η_el, d, TII, T, P, ph, R, do_elast)
-        
-        # compute_GSE_Tau!(dd, d, r_d, d_o, Eta_gbs, Eta_disl, TII, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, γ, p, c, dt, R, steady, rel_d, dtau_d)
+            compute_rheol_Tau!(Eta, Eta_diff, Eta_basal, Eta_gbs, Eta_disl, η_el, d, TII, T, P, ph, R, do_elast)
 
-        if it % nout == 0
-            #Exx  = Txx ./(2.0.*Eta)
+            TII .= exp.((1-rel).*log.(TII) .+ rel.*log.(2.0 .* Eta .* EII))
+            ΔTII .= abs.(TII .- (2.0 .* Eta .* EII))
+
+            # if it>1
+                # errd = compute_GSE_Tau!(dd, d, r_d, d_o, Eta_gbs, Eta_disl, TII, T, P, ph, λ_disl, λ_gbs, Qgg, Kgg, γ, p, c, dt, R, steady, rel_d, dtau_d)
+            # end
+            if iter % nout == 0
+                @printf("iter = %d, errTii = %1.3e, errd = %1.3e \n", iter, norm(ΔTII)./length(ΔTII), errd)
+                if max(norm(ΔTII)./length(ΔTII), errd)<1e-8 break end
+            end
+        end
+
+        # if it % nout == 0
             EII_diff    .= TII ./ (2.0 .* Eta_diff)
             EII_bas_gbs .= TII ./ (2.0 .* (Eta_basal .+ Eta_gbs))
             EII_disl    .= TII ./ (2.0 .* Eta_disl)
@@ -167,8 +194,10 @@ end
             # display(heatmap(Tvec, log10.(EIIvec), log10.(Eta)'))
             p1 = heatmap(Tvec, log10.(EIIvec), Mech', color=palette(:inferno, 5))
                 # contour!(Tvec, log10.(EIIvec), log10.(2.0.*TII./1e6)', color = :black, levels = -5:1:3)
-            display(plot(p1))
-        end
+            # display(plot(p1))
+            display(heatmap(Tvec, log10.(EIIvec), log10.(1e3*d)'))
+            # display(heatmap(Tvec, log10.(EIIvec), log10.(TII)'))
+        # end
     end
     if do_save
         !ispath(joinpath(@__DIR__, "../output")) && mkdir(joinpath(@__DIR__, "../output"))
